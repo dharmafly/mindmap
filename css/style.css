@@ -9,13 +9,13 @@ body {
 	right: 2em;
 }
 
-svg .node text {
+svg .nodes text {
 	alignment-baseline: middle;
 }
 
-svg .node rect {
+svg .nodes rect {
 	fill: none;
-	stroke: none;
+	stroke: blue;
 	stroke-width: 3;
 }
 
@@ -24,16 +24,16 @@ svg .hub > rect {
 	stroke: darkgreen;
 }
 
-svg .node.selected > text {
+svg .nodes .selected > text {
 	fill: #d00;
 }
 
-svg .node.selected > rect {
+svg .nodes .selected > rect {
 	fill: #fdd;
 	stroke: #d00;
 }
 
-svg path {
+svg .paths path {
 	stroke: darkgreen;
 	stroke-width: 2;
 	fill: none;
