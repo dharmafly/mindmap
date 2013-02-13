@@ -3,19 +3,37 @@ body {
 	padding: 0;
 }
 
-svg > .node rect {
-	fill: lightgreen;
-	stroke: darkgreen;
+.instructions {
+	position: absolute;
+	top: 0;
+	right: 2em;
+}
+
+svg .node text {
+	alignment-baseline: middle;
+}
+
+svg .node rect {
+	fill: none;
+	stroke: none;
 	stroke-width: 3;
 }
 
-svg > .node text {
-	/*text-anchor: middle;
-	alignment-baseline: middle;*/
-	font-size: 20;
+svg .hub > rect {
+	fill: lightgreen;
+	stroke: darkgreen;
 }
 
-svg .node path {
+svg .node.selected > text {
+	fill: #d00;
+}
+
+svg .node.selected > rect {
+	fill: #fdd;
+	stroke: #d00;
+}
+
+svg path {
 	stroke: darkgreen;
 	stroke-width: 2;
 	fill: none;

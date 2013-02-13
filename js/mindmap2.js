@@ -1,47 +1,20 @@
 (function(){
 	'use strict';
 
-	var data = {
-		title: 'trees',
-		nodes: [
-			{
-				title: 'oak',
-				nodes: [
-					{title: 'acorn'},
-					{title: 'leaf'},
-					{title: 'royal oak'}
-				]
-			},
-			{
-				title: 'birch',
-				nodes: [
-					{
-						title:'silver',
-						nodes:[
-							{title: 'gold'},
-							{title: 'platinum'}
-						]
-					},
-					{title:'swedish'}
-				]
-			}
-		]
-	};
-
-	/////
-
 	// Check browser support
 	if (!Pablo.isSupported){
 		return;
 	}
 
-	var HUB_PADDING_X = 8,
+	var HUB_X = 20,
+		HUB_Y = '50%',
+		HUB_PADDING_X = 8,
 		HUB_PADDING_Y = 5,
 		HUB_CORNER_R = 5;
 
 
 	function MindMap(htmlContainer){
-		this.nodes = [];
+		this.nodes = {};
 		
 		this.width = window.innerWidth;
 		this.height = window.innerHeight;
@@ -54,29 +27,34 @@
 	}
 
 	MindMap.prototype = {
-		nodes: null,
-		selected: null,
-
-		askHub: function(){
-			var title = prompt('What\'s the concept?');
+		askChild: function(parent){
+			var title = this.trim(prompt('What\'s the text?'));
 			if (title){
-				this.drawHub(title);
+				if (parent){
+					this.drawChild(parent, title);
+				}
+				else {
+					this.drawHub(title);
+				}
 			}
 			return this;
 		},
 
 		drawHub: function(title){
-			var dom, text, bbox, ellipse, node;
+			var node, text, bbox, ellipse, node;
 
-			dom = this.svg.g().addClass('node');
-			text = dom.text({
-				x: 20,
-				y: '50%'
+			node = this.svg.g()
+				.addClass('node')
+				.addClass('hub');
+
+			text = node.text({
+				x: HUB_X,
+				y: HUB_Y
 			}).content(title);
 
 			bbox = text[0].getBBox();
 
-			dom.prepend('rect', {
+			node.prepend('rect', {
 				x: bbox.x - HUB_PADDING_X,
 				y: bbox.y - HUB_PADDING_Y,
 				width: bbox.width + HUB_PADDING_X * 2,
@@ -84,74 +62,219 @@
 				rx: HUB_CORNER_R
 			});
 
-			/*
-			ellipse = dom.prepend('ellipse', {
-				cx: bbox.x + bbox.width / 2,
-				cy: bbox.y + bbox.height / 2,
-				rx: bbox.width,
-				ry: bbox.height
-			});
-			*/
-
-			node = {dom:dom, nodes:[]};
-			this.nodes = node;
-			this.selected = node;
+			// Add container for child nodes
+			node.g().addClass('nodes');
+			this.select(node);
 
 			return this;
 		},
 
-		askChild: function(parent){
-			var title = prompt('What\'s the text?');
-			if (title){
-				this.drawChild(parent, title);
-			}
-			return this;
-		},
-
-		drawPath: function(from, to){
-			var fromBBox = from[0].getBBox(),
-				toBBox = to[0].getBBox();
-
-			return Pablo.path({
-				d:  'M' + (fromBBox.x + fromBBox.width + HUB_PADDING_X) + ' ' +
-					      (fromBBox.y + fromBBox.height / 2) +
-					'L' + toBBox.x + ' ' +
-						  (toBBox.y + toBBox.height) +
-					'L' + (toBBox.x + toBBox.width) + ' ' +
-						  (toBBox.y + toBBox.height)
-			});
+		hub: function(){
+			return this.svg.find('.hub');
 		},
 
 		randomInt: function(length){
 	        return Math.ceil((length || 2) * Math.random()) - 1;
 	    },
 
+	    getNodes: function(node){
+	    	return node.find('.nodes').eq(0);
+	    },
+
+	    getParentNode: function(node){
+	    	return node.parent().parent();
+	    },
+
+	    pathData: function(parentBBox, childBBox, parentIsHub){
+	    	return  'M' + (parentBBox.x + parentBBox.width + (parentIsHub ? HUB_PADDING_X : 0)) + ' ' +
+					      (parentBBox.y + parentBBox.height / (parentIsHub ? 2 : 1)) +
+					'L' + childBBox.x + ' ' +
+						  (childBBox.y + childBBox.height) +
+					'L' + (childBBox.x + childBBox.width) + ' ' +
+						  (childBBox.y + childBBox.height);
+	    },
+
 		drawChild: function(parent, title){
-			var dom, node, text, path, parentBBox, parentText;
+			var node, nodes, text, path, parentBBox, parentText, childBBox, parentIsHub;
 
-			parentText = parent.dom.find('text').eq(0);
+			parentText = parent.find('text').eq(0);
 			parentBBox = parentText[0].getBBox();
-			dom = parent.dom.g().addClass('node');
+			nodes = this.getNodes(parent);
+			node = nodes.g().addClass('node');
 
-			text = dom.text({
+			text = node.text({
 				x: parentBBox.x + parentBBox.width + 80,
 				y: this.randomInt(this.height - 20)
 			}).content(title);
+			childBBox = text[0].getBBox();
+			parentIsHub = parent.hasClass('hub');
 
-			path = this.drawPath(parentText, text).appendTo(dom);
-			node = {dom:dom};
-			parent.nodes.push(node);
+			path = node.path({
+				d:  this.pathData(parentBBox, childBBox, parentIsHub)
+			});
+
+			// Add container for child nodes
+			node.g().addClass('nodes');
+			this.select(node);
 
 			return this;
 		},
 
-		onkeypress: function(event){
-			var charCode = event.which;
+		calculateNextPos: function(parent){
+			var PI = Math.PI,
+				minTheta = PI / 20,
+				distance = 80,
+				startAngles = [PI / 2, PI - minTheta, minTheta],
+				children = this.getNodes(parent).children(),
+				hubBBox = this.hub()[0].getBBox(),
+				maxDiff, diff, angle, sortedChildren;
 
-			// Return key
-			if (charCode === 13){
-				this.askChild(this.selected);
+			if (children.length < startAngles.length){
+				angle = startAngles[children.length];
 			}
+
+			else {
+				maxDiff = 0;
+				sortedChildren = this.sortByAngle(children);
+
+				children.slice(0, children.length-1)
+					.each(function(el, i){
+						var node1 = Pablo(el),
+							node2 = Pablo(children.get(i+1)),
+							angle1 = this.getAngle(node1),
+							angle2 = this.getAngle(node2);
+
+						diff = angle1 - angle2;
+
+						if (maxDiff + 0.000001 < diff){
+							maxDiff = diff;
+							angle = (angle1 + angle2) / 2;
+						}
+					});
+			}
+
+			return {
+				x: hubBBox.x + Math.sin(angle) * distance,
+				y: hubBBox.y + Math.cos(angle) * distance
+			};
+		},
+
+		selected: function(){
+			return this.svg.find('.selected');
+		},
+
+		select: function(node){
+			if (node.hasClass('node')){
+				this.selected().removeClass('selected');
+				node.addClass('selected');
+			}
+			return this;
+		},
+
+		trim: function(str){
+			return str.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+		},
+
+		getX: function(node){
+			return Number(node.find('text').eq(0).attr('x'));
+		},
+
+		getY: function(node){
+			return Number(node.find('text').eq(0).attr('y'));
+		},
+
+		sortByY: function(nodes){
+			var mindmap = this;
+			return Pablo(
+				nodes.toArray().sort(function(a, b){
+					return mindmap.getY(Pablo(a)) > mindmap.getY(Pablo(b));
+				})
+			);
+		},
+
+		getAngle: function(node){
+			var x = this.getX(node),
+				y = this.getY(node),
+				hubBBox = this.hub()[0].getBBox();
+
+			// TODO: factor in the quadrant
+			return Math.atan2((hubBBox.x + x) * (hubBBox.y + y));
+		},
+
+		sortByAngle: function(nodes){
+			var mindmap = this;
+			return Pablo(
+				nodes.toArray().sort(function(a, b){
+					return mindmap.getAngle(Pablo(a)) > mindmap.getAngle(Pablo(b));
+				})
+			);
+		},
+
+		onkeydown: function(event){
+			// See http://unixpapa.com/js/key.html
+			var code = event.which,
+				selected, parent, toSelect, children, sortedChildren, siblings, sortedSiblings, index;
+
+			if (code === 9 || code === 13 || code >= 37 || code <=40){
+				selected = this.selected();
+				parent = this.getParentNode(selected);
+				children = this.getNodes(selected).children();
+				siblings = selected.siblings();
+				event.preventDefault();
+			}
+
+			switch (code){
+				// Tab key: create a child
+				case 9:
+				this.askChild(selected);
+				break;
+
+				// Return key: create a sibling
+				case 13:
+				this.askChild(parent.length ? parent : selected);
+				break;
+
+				// Left arrow: select parent
+				case 37:
+				toSelect = parent;
+				break;
+
+				// Right arrow: select top child
+				case 39:
+				sortedChildren = this.sortByY(children);
+				toSelect = sortedChildren.first();
+				break;
+
+				// Up arrow: select sibling above
+				case 38:
+				sortedSiblings = this.sortByY(siblings);
+				index = sortedSiblings.indexOf(selected);
+				toSelect = sortedSiblings.eq(index - 1);
+
+				// Wrap around to the bottom sibling
+				if (!toSelect.length){
+					toSelect = sortedSiblings.last();
+				}
+				break;
+
+				// Down arrow: select sibling below
+				case 40:
+				sortedSiblings = this.sortByY(siblings);
+				index = sortedSiblings.indexOf(selected);
+				toSelect = sortedSiblings.eq(index + 1);
+
+				// Wrap around to the top sibling
+				if (!toSelect.length){
+					toSelect = sortedSiblings.first();
+				}
+				break;
+			}
+
+			// Select
+			if (toSelect){
+				this.select(toSelect);
+			}
+			
 			return this;
 		}
 	};
@@ -164,148 +287,79 @@
 	//mm.askHub();
 
 	mm.drawHub('Trees');
-	mm.drawChild(mm.selected, 'birch');
+	mm.drawChild(mm.hub(), 'Birch');
+	mm.drawChild(mm.hub(), 'Oak');
+	window.mm = mm;
 
-	window.addEventListener('keypress', function(event){
-		mm.onkeypress(event);
+	window.addEventListener('keydown', function(event){
+		mm.onkeydown(event);
 	}, false);
 
 
-	/////
+
+///////////
+
+return;
 
 
 
-	/*
-	function drawLabel(container, concept){
-		var label = container.text({
-			x:'50%',
-			y:'50%',
-			'text-anchor':'middle',
-			'alignment-baseline': 'middle',
-			'font-size':20
-		});
-		return label.content(concept.title);
+var PI = Math.PI,
+	minTheta = PI / 20,
+	originX = 300,
+	originY = 300,
+	r = 300,
+	startAngles = [PI / 2, PI - minTheta, minTheta],
+	angles = [];
+
+// Draw circle
+mm.svg.empty().circle({cx:300, cy:300, r:r, fill:'none', stroke:'black'});
+
+function line(x, y){
+	return mm.svg.line({x1:r, y1:r, x2:x, y2:y, stroke:'black'});
+}
+
+function drawAngle(){
+	var maxDiff, maxDiffIndex, angle, diff, i, length;
+
+	if (angles.length < startAngles.length){
+		angle = startAngles[angles.length];
 	}
+	else {
+		maxDiff = 0;
+		for (i=0, length=angles.length; i<length-1; i++){
+			diff = angles[i] - angles[i+1];
 
-	function drawEllipse(container){
-		return container.ellipse({
-			cx:'50%',
-			cy:'50%',
-			rx:40,
-			ry:20,
-			fill:'none',
-			stroke:'red',
-			'stroke-width':5
-		});
-	}
-
-	function drawConcept(concept, index, nodes){
-		var container = map.g(),
-			height = 500,
-			translateX, translateY;
-
-		drawLabel(container, concept);
-		drawEllipse(container);
-
-		console.log(concept.title, index, nodes, nodes && nodes.length);
-		if (nodes){
-			translateY = (height / (nodes.length - 1)) * index - height / 2;
-			console.log(translateY);
-			container.transform('translate', (index * 100) + ' ' + translateY);
-		}
-		
-		if (concept.nodes){
-			concept.nodes.forEach(drawConcept);
-		}
-	}
-
-	function drawConcept2(concept, depth, x, y){
-		var container = map.g();
-
-		drawLabel(container, concept);
-		drawEllipse(container);
-
-		container.transform('translate', x + ' ' + y);
-
-		console.log(concept.title, depth, x, y);
-		if (concept.nodes){
-			drawNodes(concept.nodes, depth + 1);
-		}
-	}
-
-	function drawNodes(nodes, depth){
-		var height = 500,
-			x = depth * 150,
-			distanceY = height / (nodes.length - 1);
-
-		nodes.forEach(function(concept, index){
-			var y = distanceY * index - height / 2 || 0;
-			drawConcept2(concept, depth, x, y);
-		});
-	}
-
-	function drawConceptR(root, concept, depth, x, y, rotate, rotateOriginX, rotateOriginY){
-		var container = root.g(),
-			label = drawLabel(container, concept),
-			ellipse = drawEllipse(container);
-
-		if (rotate){
-			container.transform('rotate', rotate + ' ' + rotateOriginX + ' ' + rotateOriginY);
-			var labelCenter = getCenter(label);
-			Pablo([label, ellipse])
-				.transform('rotate', -rotate + ' ' + labelCenter.x + ' ' + labelCenter.y);
-
-			// TODO: rotate label if parent has been rotated!
-		}
-		container.transform('translate', x + ' ' + y);
-
-		console.log(concept.title, depth, x, y, rotate, rotateOriginX, rotateOriginY);
-		if (concept.nodes){
-			depth ++;
-			drawNodesR(container, concept.nodes, depth);
-		}
-	}
-
-	function getCenter(elem){
-		var el = (elem || Pablo('g.map').find('text'))[0],
-			bbox = el.getBBox(),
-			x = bbox.x + (bbox.width / 2),
-			y = bbox.y + (bbox.height / 2);
-
-		return {x:x, y:y};
-	}
-
-	function drawNodesR(root, nodes, depth){
-		var height = 200,
-			x = depth * 100,
-			numNodes = nodes.length,
-			distanceY = height / (numNodes - 1),
-			doRotation = depth === 1 && numNodes > 1,
-			center, rotationPerNode, rotate, rotateOriginX, rotateOriginY;
-
-		if (doRotation){
-			rotationPerNode = 360 / numNodes;
-			center = getCenter();
-			rotateOriginX = center.x;
-			rotateOriginY = center.y;
-		}
-
-		nodes.forEach(function(concept, index){
-			var y = distanceY * index - height / 2 || 0;
-
-			if (doRotation){
-				rotate = rotationPerNode * index;
-				y = 0;
+			if (maxDiff + 0.000001 < diff){
+				maxDiff = diff;
+				maxDiffIndex = i;
 			}
-			drawConceptR(root, concept, depth, x, y, rotate, rotateOriginX, rotateOriginY);
-		});
+		}
+		angle = (angles[maxDiffIndex] + angles[maxDiffIndex+1]) / 2;
 	}
 
-	function drawMap(data){
-		drawNodesR(map, [data], 0);
-	}
+	angles.push(angle);
+	angles.sort().reverse();
+	line(originX + Math.sin(angle) * r, originY + Math.cos(angle) * r);
+}
 
-	drawMap(data);
-	*/
-	
+// TODO: use originX and y to translate groups
+
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+drawAngle();
+
 }());
