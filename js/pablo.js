@@ -472,29 +472,32 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // TRAVERSAL
         
-        children: function(nodeOrSelectors, attr){
-            // Append children and return them
-            if (attr){
-                return toPablo(nodeOrSelectors, attr).appendTo(this);
-            }
+        children: (function(){
+            var traverseChildNodes = traverse('childNodes');
+            
+            return function(nodeOrSelectors, attr){
+                // Append children and return them
+                if (attr){
+                    return toPablo(nodeOrSelectors, attr).appendTo(this);
+                }
 
-            // Get children, optionally filtered by selectors
-            else {
-                return traverse('children').call(this, nodeOrSelectors);
+                // Get children, optionally filtered by selectors
+                else {
+                    return traverseChildNodes.call(this, nodeOrSelectors);
+                }
             }
-        },
+        }()),
         next: traverse('nextElementSibling'),
         prev: traverse('previousElementSibling'),
         parent: traverse('parentNode'),
 
-        // NOTE: `parent` and `parents` matches jQuery's behaviour:
-        // the former allows `document` in the response; the latter excludes it
+        // NOTE: for an element in the DOM, the final node will be `document`
         parents: function(selectors){
             var parents = Pablo();
 
             this.each(function(el){
                 el = el.parentNode;
-                while (el && el !== document){
+                while (el){
                     parents.push(el);
                     el = el.parentNode;
                 }

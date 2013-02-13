@@ -8,8 +8,17 @@
         return;
     }
 
+    var NODE_PADDING_X = 8,
+        NODE_PADDING_Y = 5,
+        NODE_CORNER_R = 5,
+        NODE_FONT_SIZE = 20,
+        NODE_PATH_END = 6,
+        idCounter = 1;
+
     function MindMap(htmlContainer){
         var mindmap = this;
+
+        this.nodes = {};
 
         // Create SVG root
         this.svg = Pablo(htmlContainer).svg({
@@ -19,7 +28,7 @@
             .on('click', function(event){
                 var target = Pablo(event.target);
 
-                if (target.parent().hasClass('nodes')){
+                if (target.hasClass('node')){
                     mindmap.select(target);
                 }
                 else {
@@ -29,30 +38,14 @@
                     });
                 }
             });
-
-        // An object to store data about each node
-        this.nodeData = {};
-
-        // A <g> group element to contain all the paths
-        this.paths = this.svg.g().addClass('paths');
-
-        // A <g> group element to contain all the nodes
-        this.nodes = this.svg.g().addClass('nodes');
     }
 
     MindMap.prototype = {
-        NODE_PADDING_X: 8,
-        NODE_PADDING_Y: 5,
-        NODE_CORNER_R: 5,
-        NODE_FONT_SIZE: 20,
-        NODE_PATH_END: 6,
-        idCounter: 1,
-
         userCreate: function(pos){
             var title = this.trim(window.prompt('What\'s the text?'));
 
             if (title){
-                this.drawNode(pos, title, this.selected());
+                this.drawChild(pos, title, this.selected());
             }
             return this;
         },
@@ -62,99 +55,76 @@
             return this;
         },
 
-        data: function(node, data){
-            var id = node.attr('data-id');
+        drawChild: function(pos, title, parent){
+            var isHub, node, nodeId, text, textBBox, parentIsHub, nodeData, parentData, parentId, childnodes, path;
 
-            // Get data
-            if (!data){
-                return this.nodeData[id];
+            // Is the parent an existing node? If not, we'll create a hub
+            if (!parent.hasClass('node')){
+                isHub = true;
+	        	parentData = {
+	                x: 0,
+	                y: 0,
+	                width: 0,
+	                height: 0,
+	                childnodes: this.svg
+	            };
             }
-            // Set data
-            this.nodeData[id] = data;
-            return this;
-        },
-
-        getNodeById: function(id){
-            return this.nodes.find('[data-id=' + id + ']');
-        },
-
-        getPathByChildId: function(childId){
-            return this.paths.find('[data-child=' + childId + ']');
-        },
-
-        drawNode: function(pos, title, parent){
-            var isHub, node, nodeId, rect, text, textBBox, nodeWidth, nodeHeight, nodeData, parentData, parentId, path, relativeX, relativeY;
-
-            // Is there a parent to this node?
-            if (parent.length){
-                // Get data stored about the parent
-                parentData = this.data(parent);
-            }
-            // This must be the 'hub', the core concept
             else {
-                parent = this.svg;
-                parentData = {};
-            }
+	            parentId = parent.attr('id');
+	            parentData = this.nodes[parentId];
+	        }
 
-            // Generate a new id
-            nodeId = this.idCounter ++;
+            nodeId = 'node-' + idCounter;
+            idCounter += 1;
 
-            // Append to the nodes element a <g> group element to represent the node
-            node = parent.g({'data-id': nodeId}).addClass('node');
-
-            // Rounded rectangle
-            rect = node.rect({rx: this.NODE_CORNER_R});
+            // Create a group element on the container to represent the node
+            node = parentData.childnodes.g({id: nodeId})
+                    .addClass('node');
 
             // Create a text element
             text = node.text({
-                x: this.NODE_PADDING_X,
-                y: this.NODE_FONT_SIZE,
-                'font-size': this.NODE_FONT_SIZE
+                x: NODE_PADDING_X,
+                y: NODE_FONT_SIZE,
+                'font-size': NODE_FONT_SIZE
             }).content(title);
 
-            // Calculate how wide and high the text is rendered (this is a native SVG DOM method)
+            // Get bounding box coordinates
+            // This will tell us how wide and high the text is rendered
             textBBox = text[0].getBBox();
 
-            // Store data about the node
-            nodeWidth = textBBox.width + this.NODE_PADDING_X * 2;
-            nodeHeight = textBBox.height + this.NODE_PADDING_Y * 2;
-            nodeData = {
-                id:     nodeId,
-                parent: parentData.id,
-                x:      pos.x,
-                y:      pos.y,
-                width:  nodeWidth,
-                height: nodeHeight
-            };
-            this.data(node, nodeData);
+            // Add group element to contain child nodes
+            childnodes = node.g().addClass('childnodes');
 
-            // Set rectangle dimensions to surround the text element
-            rect.attr({
-                width:  nodeData.width,
-                height: nodeData.height
-            });
+            this.nodes[nodeId] = nodeData = {
+                x:      pos.x - parentData.x,  // relative to parent
+                y:      pos.y - parentData.y,  // relative to parent
+                width:  textBBox.width + NODE_PADDING_X * 2,
+                height: textBBox.height + NODE_PADDING_Y * 2,
+                childnodes: childnodes
+            };
 
             // Position the node by 'translating' it
-            relativeX = nodeData.x - (parentData.x || 0);
-            relativeY = nodeData.y - (parentData.y || 0);
-            node.transform('translate', relativeX, relativeY);
+            node.transform('translate', nodeData.x, nodeData.y);
 
-            // Draw a path from the parent to the node
-            if (parent !== this.svg){
-                // Append it to the '.paths' element
-                this.paths.path({
-                    'data-child': nodeId,
-                    d: this.pathData(nodeData, parentData)
-                });
-            }
+            // Rounded rectangle; we prepend it so the text is visible on top of it
+            node.prepend('rect', {
+                width:  nodeData.width,
+                height: nodeData.height,
+                rx:     NODE_CORNER_R
+            });
 
-            // This the 'hub', core concept
-            else {
-                // Add a `class` attribute
-                node.addClass('hub');
-
+            if (isHub){
                 // Remove the mindmap instructions, as we're adding the first node
                 this.removeInstructions();
+
+                // Add a `class` attribute
+                node.addClass('hub');
+            }
+            else {
+                // Add path
+                parentData.childnodes.prepend('path',{
+                    d:  this.pathData(nodeData, parentData)
+                });
             }
 
             // Select the node
@@ -163,14 +133,14 @@
 
         // nodeData x and y is relative to parentData
         pathData: function(nodeData, parentData){
-        	var isLeft  = nodeData.x < parentData.x,
+        	var isLeft  = nodeData.x < 0,
         		d = '';
 
-        	d += 'M' + parentData.x + ' ' + (parentData.y + parentData.height / 2) +
-                 'l' + (isLeft ? 0 - this.NODE_PATH_END : this.NODE_PATH_END) + ' ' + 0 +
-                 'L' + (isLeft ? nodeData.x + nodeData.width + this.NODE_PATH_END : nodeData.x - this.NODE_PATH_END) + ' ' +
+        	d += 'M' + (isLeft  ? 0 : parentData.width) + ' ' +
+        		 	   (parentData.height / 2) +
+                 'L' + (isLeft ? nodeData.x + nodeData.width : nodeData.x) + ' ' +
                        (nodeData.y + nodeData.height / 2) +
-                 'l' + (isLeft ? 0 - this.NODE_PATH_END : this.NODE_PATH_END) + ' ' + 0;
+                 'l' + (isLeft ? -NODE_PATH_END : NODE_PATH_END) + ' ' + 0;
 
             return d;
         },
@@ -291,10 +261,10 @@
 
 
     var mm = new MindMap('#mindmap');
-    mm.drawNode({x:220, y:300}, 'Trees', mm.selected());
-    mm.drawNode({x:100, y:100}, 'Birch', mm.hub());
-    mm.drawNode({x:150, y:500}, 'Oak', mm.hub());
-    mm.drawNode({x:10, y:400}, 'Breem', mm.svg.find('.node').last());
+    mm.drawChild({x:220, y:300}, 'Trees', mm.selected());
+    mm.drawChild({x:100, y:100}, 'Birch', mm.hub());
+    mm.drawChild({x:150, y:500}, 'Oak', mm.hub());
+    mm.drawChild({x:0, y:0}, 'Breem', mm.svg.find('.node').last());
     window.mm = mm;
 
     /*
