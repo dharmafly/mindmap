@@ -19,6 +19,12 @@ svg .node rect {
 	stroke-width: 3;
 }
 
+svg .node path {
+	stroke: darkgreen;
+	stroke-width: 2;
+	fill: none;
+}
+
 svg .hub > rect {
 	fill: lightgreen;
 	stroke: darkgreen;
@@ -31,10 +37,4 @@ svg .node.selected > text {
 svg .node.selected > rect {
 	fill: #fdd;
 	stroke: #d00;
-}
-
-svg .paths path {
-	stroke: darkgreen;
-	stroke-width: 2;
-	fill: none;
 }
