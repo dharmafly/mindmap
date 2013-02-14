@@ -201,84 +201,14 @@
     /////
 
 
-    var mm = new MindMap('#mindmap');
-    mm.drawNode(220, 300, 'Trees', mm.selected());
-    mm.drawNode(100, 100, 'Birch', mm.svg.children('.node'));
-    mm.drawNode(150, 500, 'Oak', mm.svg.children('.node'));
-    mm.drawNode(10, 400, 'Larch', mm.svg.find('.node').last());
+    var mm = new MindMap('#mindmap'),
+        svg = mm.svg;
+
+    mm.drawNode(220, 300, 'Trees', svg)
+      .drawNode(100, 100, 'Birch', svg.find('.node').eq(0))
+      .drawNode(150, 500, 'Oak', svg.find('.node').eq(0))
+      .drawNode(10, 400, 'Larch', svg.find('.node').eq(2))
+      .drawNode(310, 230, 'Pine', svg.find('.node').eq(0));
     window.mm = mm;
-
-    /*
-    window.addEventListener('keydown', function(event){
-        mm.onkeydown(event);
-    }, false);
-    */
-
-
-
-///////////
-
-return;
-
-
-
-var PI = Math.PI,
-    minTheta = PI / 20,
-    originX = 300,
-    originY = 300,
-    r = 300,
-    startAngles = [PI / 2, PI - minTheta, minTheta],
-    angles = [];
-
-// Draw circle
-mm.svg.empty().circle({cx:300, cy:300, r:r, fill:'none', stroke:'black'});
-
-function line(x, y){
-    return mm.svg.line({x1:r, y1:r, x2:x, y2:y, stroke:'black'});
-}
-
-function drawAngle(){
-    var maxDiff, maxDiffIndex, angle, diff, i, length;
-
-    if (angles.length < startAngles.length){
-        angle = startAngles[angles.length];
-    }
-    else {
-        maxDiff = 0;
-        for (i=0, length=angles.length; i<length-1; i++){
-            diff = angles[i] - angles[i+1];
-
-            if (maxDiff + 0.000001 < diff){
-                maxDiff = diff;
-                maxDiffIndex = i;
-            }
-        }
-        angle = (angles[maxDiffIndex] + angles[maxDiffIndex+1]) / 2;
-    }
-
-    angles.push(angle);
-    angles.sort().reverse();
-    line(originX + Math.sin(angle) * r, originY + Math.cos(angle) * r);
-}
-
-// TODO: use originX and y to translate groups
-
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
-drawAngle();
 
 }());
