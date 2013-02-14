@@ -9,13 +9,17 @@ body {
 	right: 2em;
 }
 
+svg .node {
+	cursor: pointer;
+}
+
 svg .node text {
 	alignment-baseline: middle;
 }
 
 svg .node rect {
 	fill: none;
-	stroke: blue;
+	stroke: none;
 	stroke-width: 3;
 }
 
@@ -38,4 +42,5 @@ svg .node.selected > text {
 svg .node.selected > rect {
 	fill: #fdd;
 	stroke: #d00;
+	stroke-width: 1;
 }

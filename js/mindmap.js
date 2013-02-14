@@ -17,10 +17,14 @@
                 height: window.innerHeight
             })
             .on('click', function(event){
-                var target = Pablo(event.target);
+                var target = Pablo(event.target),
+                    node;
 
-                if (target.parent().hasClass('nodes')){
-                    mindmap.select(target);
+                node = target.hasClass('node') ?
+                    node : target.parents('.node').eq(0);
+
+                if (node.length){
+                    mindmap.select(node);
                 }
                 else {
                     mindmap.userCreate({
