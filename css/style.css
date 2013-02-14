@@ -25,7 +25,8 @@ svg .node path {
 	fill: none;
 }
 
-svg .hub > rect {
+/* Hub */
+svg > .node > rect {
 	fill: lightgreen;
 	stroke: darkgreen;
 }

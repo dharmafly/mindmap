@@ -50,7 +50,7 @@
             var title = this.trim(window.prompt('What\'s the text?'));
 
             if (title){
-                this.drawNode(pos, title, this.selected());
+                this.drawNode(pos.x, pos.y, title, this.selected());
             }
             return this;
         },
@@ -60,9 +60,7 @@
             return this;
         },
 
-        data: function(node, data){
-            var id = node.attr('data-id');
-
+        data: function(id, data){
             // Get data
             if (!data){
                 return this.nodeData[id];
@@ -76,19 +74,15 @@
             return this.nodes.find('[data-id=' + id + ']');
         },
 
-        drawNode: function(pos, title, parent){
-            var isHub, node, nodeId, nodeData, parentData;
+        drawNode: function(screenX, screenY, title, parent){
+            var node, nodeId, nodeData, text, textBBox;
 
-            // Is there a parent to this node?
-            if (parent.length){
-                // Get data stored about the parent
-                parentData = this.data(parent);
-            }
-            // This must be the 'hub', the core concept
-            else {
-                isHub = true;
+            if (!parent.length){
+                // This must be the 'hub', the core concept
                 parent = this.svg;
-                parentData = {x:0, y:0};
+
+                // Remove the mindmap instructions, as we're adding the first node
+                this.removeInstructions();
             }
 
             // Generate a new id
@@ -98,80 +92,70 @@
             node = parent.g({'data-id': nodeId})
                          .addClass('node');
 
-            // Create a <rect> rectangle element and give it rounded corners
-            node.rect({rx: this.NODE_CORNER_R});
+            // Create a <path> element from the parent to the node
+            // Its path data is set in the `setPosition` method
+            node.path();
 
             // Create a <text> element and set its text content
-            node.text({'font-size': this.NODE_FONT_SIZE})
-                       .content(title);
-
-            // This the 'hub', core concept
-            if (isHub){
-                // Add a `class` attribute
-                node.addClass('hub');
-
-                // Remove the mindmap instructions, as we're adding the first node
-                this.removeInstructions();
-            }
-
-            // Draw a path from the parent to the node
-            else {
-                node.path({
-                    'data-child': nodeId
-                });
-            }
-
-            // Set the position of the node
-            nodeData = this.setPosition(node, pos, parentData);
-
-            // Store data about the node in memory
-            Pablo.extend(nodeData, {
-                id: nodeId,
-                parent: parentData.id
-            });
-            this.data(node, nodeData);
-
-            // Select the node
-            return this.select(node);
-        },
-
-        setPosition: function(node, pos, parentData){
-            var elements = node.children(),
-                text = elements.select('text'),
-                rect = elements.select('rect'),
-                path = elements.select('path'),
-                textBBox, nodeData, relativeX, relativeY;
-
-            text.attr({
-                x: this.NODE_PADDING_X,
-                y: this.NODE_FONT_SIZE
-            });
+            text = node.text({
+                    x: this.NODE_PADDING_X,
+                    y: this.NODE_FONT_SIZE,
+                    'font-size': this.NODE_FONT_SIZE
+                })
+                .content(title);
 
             // Get the text's rendered dimensions; a native SVG DOM method
             textBBox = text[0].getBBox();
 
+            // Store data about the node in memory
             nodeData = {
-                x:      pos.x,
-                y:      pos.y,
-                width:  textBBox.width + this.NODE_PADDING_X * 2,
+                id: nodeId,
+                parent: parent.attr('data-id') || null,
+                width:  textBBox.width  + this.NODE_PADDING_X * 2,
                 height: textBBox.height + this.NODE_PADDING_Y * 2
             };
+            this.data(nodeId, nodeData);
 
-            // Set rectangle dimensions to surround the text element
-            rect.attr({
+            // Prepend a <rect> rectangle element to surround the text element
+            // It is prepended so that the text appears on top
+            node.prepend('rect', {
                 width:  nodeData.width,
-                height: nodeData.height
+                height: nodeData.height,
+                rx: this.NODE_CORNER_R // rounded corners
             });
 
-            // Position the node by 'translating' it
-            relativeX = pos.x - parentData.x;
-            relativeY = pos.y - parentData.y;
-            node.transform('translate', relativeX, relativeY);
+            // Select the node and set its position
+            return this.select(node)
+                       .setPosition(node, screenX, screenY);
+        },
 
-            if (path.length){
-                path.attr('d', this.pathData(nodeData, parentData));
+        setPosition: function(node, screenX, screenY){
+            // Position the node by 'translating' it
+            var nodeId = node.attr('data-id'),
+                nodeData = this.data(nodeId),
+                parentData = this.data(nodeData.parent),
+                relativeX = screenX,
+                relativeY = screenY;
+
+            // Make x & y relative to the parent
+            Pablo.extend(nodeData, {x:screenX, y:screenY});
+
+            // Update stored data
+            this.data(nodeId, nodeData);
+
+            if (parentData){
+                // Draw path to the parent
+                node.children('path')
+                    .attr('d', this.pathData(nodeData, parentData));
+
+                // Calculate coordinates relative to the parent
+                relativeX -= parentData.x;
+                relativeY -= parentData.y;
             }
-            return nodeData;
+
+            // Translate the node to the new coordinates
+            node.transform('translate', relativeX, relativeY);
+            return this;
         },
 
         pathData: function(nodeData, parentData){
@@ -217,10 +201,10 @@
 
 
     var mm = new MindMap('#mindmap');
-    mm.drawNode({x:220, y:300}, 'Trees', mm.selected());
-    mm.drawNode({x:100, y:100}, 'Birch', mm.svg.find('.hub'));
-    mm.drawNode({x:150, y:500}, 'Oak', mm.svg.find('.hub'));
-    mm.drawNode({x:10, y:400}, 'Breem', mm.svg.find('.node').last());
+    mm.drawNode(220, 300, 'Trees', mm.selected());
+    mm.drawNode(100, 100, 'Birch', mm.svg.children('.node'));
+    mm.drawNode(150, 500, 'Oak', mm.svg.children('.node'));
+    mm.drawNode(10, 400, 'Breem', mm.svg.find('.node').last());
     window.mm = mm;
 
     /*
