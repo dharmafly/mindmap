@@ -60,21 +60,16 @@
             return this;
         },
 
+        // Get or set node data in memory
         data: function(id, data){
-            // Get data
             if (!data){
                 return this.nodeData[id];
             }
-            // Set data
             this.nodeData[id] = data;
             return this;
         },
 
-        getNodeById: function(id){
-            return this.nodes.find('[data-id=' + id + ']');
-        },
-
-        drawNode: function(screenX, screenY, title, parent){
+        drawNode: function(pageX, pageY, title, parent){
             var node, nodeId, nodeData, text, textBBox;
 
             if (!parent.length){
@@ -104,7 +99,9 @@
                 })
                 .content(title);
 
-            // Get the text's rendered dimensions; a native SVG DOM method
+            // Get the text's rendered dimensions
+            // getBBox is a very useful native SVG DOM method
+            // see also 
             textBBox = text[0].getBBox();
 
             // Store data about the node in memory
@@ -126,19 +123,19 @@
 
             // Select the node and set its position
             return this.select(node)
-                       .setPosition(node, screenX, screenY);
+                       .setPosition(node, pageX, pageY);
         },
 
-        setPosition: function(node, screenX, screenY){
+        setPosition: function(node, pageX, pageY){
             // Position the node by 'translating' it
             var nodeId = node.attr('data-id'),
                 nodeData = this.data(nodeId),
                 parentData = this.data(nodeData.parent),
-                relativeX = screenX,
-                relativeY = screenY;
+                relativeX = pageX,
+                relativeY = pageY;
 
             // Make x & y relative to the parent
-            Pablo.extend(nodeData, {x:screenX, y:screenY});
+            Pablo.extend(nodeData, {x:pageX, y:pageY});
 
             // Update stored data
             this.data(nodeId, nodeData);
@@ -204,7 +201,7 @@
     mm.drawNode(220, 300, 'Trees', mm.selected());
     mm.drawNode(100, 100, 'Birch', mm.svg.children('.node'));
     mm.drawNode(150, 500, 'Oak', mm.svg.children('.node'));
-    mm.drawNode(10, 400, 'Breem', mm.svg.find('.node').last());
+    mm.drawNode(10, 400, 'Larch', mm.svg.find('.node').last());
     window.mm = mm;
 
     /*
