@@ -304,7 +304,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
             // Element has no parent, so clone it and append to a
             // temporary element
-            else {
+            else if (!isHTMLDocument(node[0])) {
                 node = node.clone();
                 ancestor = Pablo.g().append(node);
                 matches = ancestor.find(selectors);
@@ -474,7 +474,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         
         children: (function(){
             var traverseChildNodes = traverse('childNodes');
-            
+
             return function(nodeOrSelectors, attr){
                 // Append children and return them
                 if (attr){

@@ -46,7 +46,7 @@ var MindMap = (function(){
         idCounter: 1,
 
         nearestNode: function(el){
-            var node = Pablo(event.target);
+            var node = Pablo(el);
             return node.hasClass('node') ?
                 node : node.parents('.node').first();
         },
