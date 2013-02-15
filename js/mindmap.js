@@ -133,10 +133,6 @@ var MindMap = (function(){
             node = parent.g({'data-id': nodeId})
                          .addClass('node');
 
-            // Create a <path> element from the parent to the node
-            // Its path data is set in the `setPosition` method
-            node.path();
-
             // Create a <text> element and set its text content
             text = node.text({
                     x: this.NODE_PADDING_X,
@@ -166,6 +162,10 @@ var MindMap = (function(){
                 height: nodeData.height,
                 rx: this.NODE_CORNER_R // rounded corners
             });
+
+            // Create a <path> element from the parent to the node
+            // Its path data is set in the `setPosition` method
+            node.prepend('path', {});
 
             // Select the node and set its position
             return this.select(node)
@@ -235,6 +235,7 @@ var MindMap = (function(){
         select: function(node){
             this.selected().removeClass('selected');
             node.addClass('selected');
+            node.appendTo(node.parent());
             return this;
         }
     };
