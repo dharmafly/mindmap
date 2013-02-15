@@ -1,6 +1,6 @@
 /*global Pablo*/
 /*jshint newcap:false*/
-(function(){
+var MindMap = (function(){
     'use strict';
 
     // Check browser support
@@ -253,4 +253,9 @@
       .drawNode(310, 230, 'Pine', svg.find('.node').first());
     window.mm = mm;
 
+
+    /////
+
+
+    return MindMap;
 }());
