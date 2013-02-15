@@ -16,23 +16,19 @@
                 width: window.innerWidth,
                 height: window.innerHeight
             })
-            .on('click', function(event){
-                var target = Pablo(event.target),
-                    node;
-
-                node = target.hasClass('node') ?
-                    node : target.parents('.node').eq(0);
-
-                if (node.length){
-                    mindmap.select(node);
-                }
-                else {
-                    mindmap.userCreate({
-                        x: event.pageX,
-                        y: event.pageY
-                    });
-                }
+            .on('mousedown', function(event){
+                mindmap.onmousedown(event);
+            })
+            .on('mousemove', function(event){
+                mindmap.onmousemove(event);
+            })
+            .on('mouseup', function(event){
+                mindmap.onmouseup(event);
             });
+
+        window.addEventListener('blur', function(){
+            mindmap.onwindowblur();
+        });
 
         // An object to store data about each node
         this.nodeData = {};
@@ -46,15 +42,61 @@
         NODE_PATH_END: 6,
         idCounter: 1,
 
+        nearestNode: function(el){
+            var node = Pablo(event.target);
+            return node.hasClass('node') ?
+                node : node.parents('.node').first();
+        },
+
+        onmousedown: function(event){
+            var node = this.nearestNode(event.target),
+                x = event.pageX,
+                y = event.pageY,
+                id, nodeData;
+
+            if (node.length){
+                this.select(node);
+                this.dragging = node;
+                id = node.attr('data-id');
+                nodeData = this.nodeData[id];
+                this.dragOffsetX = x - nodeData.x;
+                this.dragOffsetY = y - nodeData.y;
+                this.svg.addClass('dragging');
+            }
+            else {
+                this.userCreate(x, y);
+            }
+        },
+
+        onmousemove: function(event){
+            var x, y;
+            if (this.dragging){
+                x = event.pageX - this.dragOffsetX;
+                y = event.pageY - this.dragOffsetY;
+                this.setPosition(this.dragging, x, y);
+            }
+        },
+
+        onmouseup: function(event){
+            if (this.dragging){
+                this.dragging = null;
+                this.svg.removeClass('dragging');
+            }
+        },
+
+        onwindowblur: function(){
+            this.dragging = null;
+        },
+
         trim: function(str){
             return str ? str.replace(/^\s\s*/, '').replace(/\s\s*$/, '') : '';
         },
 
-        userCreate: function(pos){
+        userCreate: function(x, y){
             var title = this.trim(window.prompt('What\'s the text?'));
 
             if (title){
-                this.drawNode(pos.x, pos.y, title, this.selected());
+                this.drawNode(x, y, title, this.selected());
             }
             return this;
         },
@@ -205,10 +247,10 @@
         svg = mm.svg;
 
     mm.drawNode(220, 300, 'Trees', svg)
-      .drawNode(100, 100, 'Birch', svg.find('.node').eq(0))
-      .drawNode(150, 500, 'Oak', svg.find('.node').eq(0))
+      .drawNode(100, 100, 'Birch', svg.find('.node').first())
+      .drawNode(150, 500, 'Oak', svg.find('.node').first())
       .drawNode(10, 400, 'Larch', svg.find('.node').eq(2))
-      .drawNode(310, 230, 'Pine', svg.find('.node').eq(0));
+      .drawNode(310, 230, 'Pine', svg.find('.node').first());
     window.mm = mm;
 
 }());

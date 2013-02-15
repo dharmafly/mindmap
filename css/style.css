@@ -35,12 +35,21 @@ svg > .node > rect {
 	stroke: darkgreen;
 }
 
+/* Selected */
 svg .node.selected > text {
 	fill: #d00;
 }
-
 svg .node.selected > rect {
 	fill: #fdd;
 	stroke: #d00;
 	stroke-width: 1;
+}
+
+/* Prevent text selection highlighting on dragging a node */
+svg.dragging text {
+	user-select: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
 }
