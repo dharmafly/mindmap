@@ -32,6 +32,9 @@ var MindMap = (function(){
 
         // An object to store data about each node
         this.nodeData = {};
+
+        // Add instructions message
+        this.addInstructions();
     }
 
     MindMap.prototype = {
@@ -101,6 +104,16 @@ var MindMap = (function(){
             return this;
         },
 
+        addInstructions: function(){
+            this.svg.text({
+                x: '50%',
+                y: '50%'
+            })
+            .addClass('instructions')
+            .content('Click anywhere to create nodes');
+            return this;
+        },
+
         removeInstructions: function(){
             Pablo('.instructions').remove();
             return this;
@@ -166,6 +179,8 @@ var MindMap = (function(){
             // Create a <path> element from the parent to the node
             // Its path data is set in the `setPosition` method
             node.prepend('path', {});
+            // TODO: set text, path, rect and then text.bringToFront()
+            // === text.append(text.parent());
 
             // Select the node and set its position
             return this.select(node)
@@ -246,14 +261,14 @@ var MindMap = (function(){
 
     var mm = new MindMap('#mindmap'),
         svg = mm.svg;
-
-    mm.drawNode(220, 300, 'Trees', svg)
+/*
+    mm.drawNode(220, 300, 'Trees', Pablo())
       .drawNode(100, 100, 'Birch', svg.find('.node').first())
       .drawNode(150, 500, 'Oak', svg.find('.node').first())
       .drawNode(10, 400, 'Larch', svg.find('.node').eq(2))
       .drawNode(310, 230, 'Pine', svg.find('.node').first());
     window.mm = mm;
-
+*/
 
     /////
 
