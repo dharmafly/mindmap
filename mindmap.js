@@ -261,14 +261,14 @@ var MindMap = (function(){
 
     var mm = new MindMap('#mindmap'),
         svg = mm.svg;
-/*
+
     mm.drawNode(220, 300, 'Trees', Pablo())
       .drawNode(100, 100, 'Birch', svg.find('.node').first())
       .drawNode(150, 500, 'Oak', svg.find('.node').first())
       .drawNode(10, 400, 'Larch', svg.find('.node').eq(2))
       .drawNode(310, 230, 'Pine', svg.find('.node').first());
     window.mm = mm;
-*/
+
 
     /////
 
