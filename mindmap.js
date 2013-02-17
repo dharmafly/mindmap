@@ -11,10 +11,13 @@ var MindMap = (function(){
     function MindMap(htmlContainer){
         var mindmap = this;
 
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+
         // Create SVG root
         this.svg = Pablo(htmlContainer).svg({
-                width: window.innerWidth,
-                height: window.innerHeight
+                width: this.width,
+                height: this.height
             })
             .on('mousedown', function(event){
                 // left button click
@@ -45,7 +48,7 @@ var MindMap = (function(){
         NODE_PADDING_Y: 5,
         NODE_CORNER_R: 5,
         NODE_FONT_SIZE: 20,
-        NODE_PATH_END: 6,
+        PATH_CURVE: 30,
         idCounter: 1,
 
         nearestNode: function(el){
@@ -223,220 +226,20 @@ var MindMap = (function(){
         },
 
         // Draw a path from the parent to the child
-        pathData: function(parentData, nodeData){
-            var pIsLeft  = parentData.x < nodeData.x,
-                pIsAbove = parentData.y < nodeData.y,
-                xDiff = nodeData.x - parentData.x,
-                x1, x2,
-                y1 = parentData.height / 2,
-                y2 = nodeData.y - parentData.y,
-                tip = this.NODE_PATH_END,
-                controlLength = 30,
-                xControl, yControl;
-
-            if (pIsLeft){
-                x1 = parentData.width;
-                x2 = xDiff - x1 - tip * 2;
-                xControl = x2 / 2 - controlLength;
-            }
-            else {
-                x1 = 0;
-                x2 = xDiff + nodeData.width + tip;
-                tip = -tip;
-                xControl = x2 / 2 + controlLength;
-            }
-            yControl = pIsAbove ?
-                y2 / 2 + controlLength :
-                y2 / 2 - controlLength;
-
-            return 'm' + x1  + ' ' + y1 +
-                   'h' + tip +
-                   'q' + xControl + ' ' + yControl + ',' + x2  + ' ' + y2 +
-                   //'l' + x2  + ' ' + y2 +
-                   'h' + tip;
-
-
-            /////
-
-            var CURVE_CONTROL_DIST = 50,
-                nIsLeft  = nodeData.x < parentData.x,
-                nIsAbove = nodeData.y < parentData.y,
-                x1, x2, y1, y2, controlX1, controlX2, controlY1, controlY2,
-                cx, cy;
-
-            console.log(parentData.id, nodeData.id, parentData.width);
-
-            if (nIsLeft){
-                x1 = nodeData.width;
-                x2 = parentData.x - nodeData.x - x1;
-                controlX1 = CURVE_CONTROL_DIST;
-                controlX2 = x2;
-                cx = x2 - x1;
-            }
-            else {
-                x1 = 0;
-                x2 = parentData.x - nodeData.x + parentData.width;
-                controlX1 = 0 - CURVE_CONTROL_DIST;
-                controlX2 = x2;
-                cx = x1;
-            }
-
-            if (nIsAbove){
-                y1 = nodeData.height / 2;
-                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
-                controlY1 = 0;
-                controlY2 = CURVE_CONTROL_DIST;
-                cy = y2 - y1;
-            }
-            else {
-                y1 = nodeData.height / 2;
-                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
-                controlY1 = CURVE_CONTROL_DIST;
-                controlY2 = 0;
-                cy = y2 - y1;
-            }
-
-            /*
-            return 'm' + x1 + ' ' + y1 +
-                   'q' + cx + ' ' + cy + ',' +
-                         x2 + ' ' + y2;
-            */
-
-            // this.svg.find('[data-id=' + nodeData.id + ']').circle({cx: })
+        // p = parentData, n = nodeData
+        pathData: function(p, n){
+            var isLeft  = p.x < n.x,
+                isAbove = p.y < n.y,
+                x1 = isLeft ? p.width : 0,
+                x2 = n.x - p.x + (isLeft ? -x1 : n.width),
+                y1 = p.height / 2,
+                y2 = n.y - p.y,
+                curve = this.PATH_CURVE,
+                xCtrl = x2 / 2 + (isLeft ? -curve : curve),
+                yCtrl = y2 / 2 + (isAbove ? curve : -curve);
 
             return 'm' + x1 + ' ' + y1 +
-                   //'l' + controlX1    + ' ' + controlY1 + 
-                   //'l' + controlX2    + ' ' + controlY2 + 
-                   //'m' + (-controlX1 - controlX2)    + ' ' + (-controlY1 + -controlY2) + 
-                   'c' + controlX1 + ' ' + controlY1 + ',' +
-                         controlX2 + ' ' + controlY2 + ',' +
-                         x2 + ' ' + y2;
-                   //'l' + x2    + ' ' + y2;
-
-
-
-            // Node is left of the parent
-            if (nX < pX){
-                startX  = nodeData.width;
-                endX    = tip;
-                parentX = diffX - tip;
-            }
-            else {
-                startX  = 0;
-                endX    = 0 - tip;
-                parentX = relativeX + parentData.width + endLength;
-            }
-
-            return 'm' + startX  + ' ' + nodeMidY +
-                   'l' + endX    + ' ' + 0 +
-                   'c' + (parentX) + ',' + parentX + ' ' + parentY +
-                   //'L' + parentX + ' ' + parentY +
-                   'l' + endX    + ' ' + 0;
-        },
-
-        // Draw a path from the node to the parent
-        xxpathData: function(nodeData, parentData){
-            var CURVE_CONTROL_DIST = 50,
-                nIsLeft  = nodeData.x < parentData.x,
-                nIsAbove = nodeData.y < parentData.y,
-                x1, x2, y1, y2, controlX1, controlX2, controlY1, controlY2,
-                cx, cy;
-
-            console.log(parentData.id, nodeData.id, parentData.width);
-
-            if (nIsLeft){
-                x1 = nodeData.width;
-                x2 = parentData.x - nodeData.x - x1;
-                controlX1 = CURVE_CONTROL_DIST;
-                controlX2 = x2;
-                cx = x2 - x1;
-            }
-            else {
-                x1 = 0;
-                x2 = parentData.x - nodeData.x + parentData.width;
-                controlX1 = 0 - CURVE_CONTROL_DIST;
-                controlX2 = x2;
-                cx = x1;
-            }
-
-            if (nIsAbove){
-                y1 = nodeData.height / 2;
-                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
-                controlY1 = 0;
-                controlY2 = CURVE_CONTROL_DIST;
-                cy = y2 - y1;
-            }
-            else {
-                y1 = nodeData.height / 2;
-                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
-                controlY1 = CURVE_CONTROL_DIST;
-                controlY2 = 0;
-                cy = y2 - y1;
-            }
-
-            /*
-            return 'm' + x1 + ' ' + y1 +
-                   'q' + cx + ' ' + cy + ',' +
-                         x2 + ' ' + y2;
-            */
-
-            // this.svg.find('[data-id=' + nodeData.id + ']').circle({cx: })
-
-            return 'm' + x1 + ' ' + y1 +
-                   //'l' + controlX1    + ' ' + controlY1 + 
-                   //'l' + controlX2    + ' ' + controlY2 + 
-                   //'m' + (-controlX1 - controlX2)    + ' ' + (-controlY1 + -controlY2) + 
-                   'c' + controlX1 + ' ' + controlY1 + ',' +
-                         controlX2 + ' ' + controlY2 + ',' +
-                         x2 + ' ' + y2;
-                   //'l' + x2    + ' ' + y2;
-
-
-
-            // Node is left of the parent
-            if (nX < pX){
-                startX  = nodeData.width;
-                endX    = tip;
-                parentX = diffX - tip;
-            }
-            else {
-                startX  = 0;
-                endX    = 0 - tip;
-                parentX = relativeX + parentData.width + endLength;
-            }
-
-            return 'm' + startX  + ' ' + nodeMidY +
-                   'l' + endX    + ' ' + 0 +
-                   'c' + (parentX) + ',' + parentX + ' ' + parentY +
-                   //'L' + parentX + ' ' + parentY +
-                   'l' + endX    + ' ' + 0;
-        },
-
-        xpathData: function(nodeData, parentData){
-            var isLeft     = nodeData.x < parentData.x,
-                endLength  = this.NODE_PATH_END,
-                nodeMidY   = nodeData.height / 2,
-                parentMidY = parentData.height / 2,
-                relativeX  = parentData.x - nodeData.x,
-                relativeY  = parentData.y - nodeData.y,
-                parentY    = relativeY + parentMidY,
-                startX, endX, parentX;
-
-            if (isLeft){
-                startX  = nodeData.width;
-                endX    = endLength;
-                parentX = relativeX - endLength;
-            }
-            else {
-                startX  = 0;
-                endX    = 0 - endLength;
-                parentX = relativeX + parentData.width + endLength;
-            }
-
-            return 'm' + startX  + ' ' + nodeMidY +
-                   'l' + endX    + ' ' + 0 +
-                   'L' + parentX + ' ' + parentY +
-                   'l' + endX    + ' ' + 0;
+                   'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
         },
 
         selected: function(){
