@@ -24,7 +24,7 @@ svg .node text {
 svg .node rect {
 	fill: none;
 	stroke: none;
-	stroke-width: 3;
+	stroke-width: 2;
 }
 
 svg .node path {

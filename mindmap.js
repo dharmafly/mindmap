@@ -17,7 +17,10 @@ var MindMap = (function(){
                 height: window.innerHeight
             })
             .on('mousedown', function(event){
-                mindmap.onmousedown(event);
+                // left button click
+                if (event.which === 1){
+                    mindmap.onmousedown(event);
+                }
             })
             .on('mousemove', function(event){
                 mindmap.onmousemove(event);
@@ -129,18 +132,19 @@ var MindMap = (function(){
         },
 
         drawNode: function(pageX, pageY, title, parent){
-            var node, nodeId, nodeData, text, textBBox;
+            var nodeId, parentId, node, nodeData, text, textBBox;
 
-            if (!parent.length){
+            // Generate a new id
+            nodeId = this.idCounter ++;
+            parentId = parent.attr('data-id') || null;
+
+            if (!parentId){
                 // This must be the 'hub', the core concept
                 parent = this.svg;
 
                 // Remove the mindmap instructions, as we're adding the first node
                 this.removeInstructions();
             }
-
-            // Generate a new id
-            nodeId = this.idCounter ++;
 
             // Append a <g> group element to represent the node
             node = parent.g({'data-id': nodeId})
@@ -162,7 +166,7 @@ var MindMap = (function(){
             // Store data about the node in memory
             nodeData = {
                 id: nodeId,
-                parent: parent.attr('data-id') || null,
+                parent: parentId,
                 width:  textBBox.width  + this.NODE_PADDING_X * 2,
                 height: textBBox.height + this.NODE_PADDING_Y * 2
             };
@@ -176,11 +180,11 @@ var MindMap = (function(){
                 rx: this.NODE_CORNER_R // rounded corners
             });
 
-            // Create a <path> element from the parent to the node
-            // Its path data is set in the `setPosition` method
-            parent.prepend('path', {'data-node': nodeId});
-            // TODO: set text, path, rect and then text.bringToFront()
-            // === text.append(text.parent());
+            if (parentId){
+                // Create a <path> element from the parent to the node
+                // The path's coordinates are set in the `setPosition` method
+                parent.prepend('path', {'data-child': nodeId});
+            }
 
             // Select the node and set its position
             return this.select(node)
@@ -193,8 +197,8 @@ var MindMap = (function(){
                 nodeData = this.data(nodeId),
                 parentId = nodeData.parent,
                 parentData = this.data(parentId),
-                relativeX = pageX,
-                relativeY = pageY,
+                relX = pageX,
+                relY = pageY,
                 path;
 
             // Make x & y relative to the parent
@@ -205,16 +209,16 @@ var MindMap = (function(){
 
             if (parentData){
                 // Draw path from the parent to the node
-                path = this.svg.find('[data-id="' + parentId + '"] > path[data-node="' + nodeId + '"]');
+                path = this.svg.find('path[data-child="' + nodeId + '"]');
                 path.attr('d', this.pathData(parentData, nodeData));
 
                 // Calculate coordinates relative to the parent
-                relativeX -= parentData.x;
-                relativeY -= parentData.y;
+                relX = pageX - parentData.x;
+                relY = pageY - parentData.y;
             }
 
             // Translate the node to the new coordinates
-            node.transform('translate', relativeX, relativeY);
+            node.transform('translate', relX, relY);
             return this;
         },
 
@@ -226,21 +230,29 @@ var MindMap = (function(){
                 x1, x2,
                 y1 = parentData.height / 2,
                 y2 = nodeData.y - parentData.y,
-                tip = this.NODE_PATH_END;
+                tip = this.NODE_PATH_END,
+                controlLength = 30,
+                xControl, yControl;
 
             if (pIsLeft){
                 x1 = parentData.width;
                 x2 = xDiff - x1 - tip * 2;
+                xControl = x2 / 2 - controlLength;
             }
             else {
                 x1 = 0;
                 x2 = xDiff + nodeData.width + tip;
                 tip = -tip;
+                xControl = x2 / 2 + controlLength;
             }
+            yControl = pIsAbove ?
+                y2 / 2 + controlLength :
+                y2 / 2 - controlLength;
 
             return 'm' + x1  + ' ' + y1 +
                    'h' + tip +
-                   'l' + x2  + ' ' + y2 +
+                   'q' + xControl + ' ' + yControl + ',' + x2  + ' ' + y2 +
+                   //'l' + x2  + ' ' + y2 +
                    'h' + tip;
 
 
