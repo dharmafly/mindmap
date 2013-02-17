@@ -216,7 +216,85 @@ var MindMap = (function(){
             return this;
         },
 
+        // Draw a path from the node to the parent
         pathData: function(nodeData, parentData){
+            var CURVE_CONTROL_DIST = 50,
+                nIsLeft  = nodeData.x < parentData.x,
+                nIsAbove = nodeData.y < parentData.y,
+                x1, x2, y1, y2, controlX1, controlX2, controlY1, controlY2,
+                cx, cy;
+
+            console.log(parentData.id, nodeData.id, parentData.width);
+
+            if (nIsLeft){
+                x1 = nodeData.width;
+                x2 = parentData.x - nodeData.x - x1;
+                controlX1 = CURVE_CONTROL_DIST;
+                controlX2 = x2;
+                cx = x2 - x1;
+            }
+            else {
+                x1 = 0;
+                x2 = parentData.x - nodeData.x + parentData.width;
+                controlX1 = 0 - CURVE_CONTROL_DIST;
+                controlX2 = x2;
+                cx = x1;
+            }
+
+            if (nIsAbove){
+                y1 = nodeData.height / 2;
+                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
+                controlY1 = 0;
+                controlY2 = CURVE_CONTROL_DIST;
+                cy = y2 - y1;
+            }
+            else {
+                y1 = nodeData.height / 2;
+                y2 = parentData.y - nodeData.y - y1 + parentData.height / 2;
+                controlY1 = CURVE_CONTROL_DIST;
+                controlY2 = 0;
+                cy = y2 - y1;
+            }
+
+            /*
+            return 'm' + x1 + ' ' + y1 +
+                   'q' + cx + ' ' + cy + ',' +
+                         x2 + ' ' + y2;
+            */
+
+            // this.svg.find('[data-id=' + nodeData.id + ']').circle({cx: })
+
+            return 'm' + x1 + ' ' + y1 +
+                   //'l' + controlX1    + ' ' + controlY1 + 
+                   //'l' + controlX2    + ' ' + controlY2 + 
+                   //'m' + (-controlX1 - controlX2)    + ' ' + (-controlY1 + -controlY2) + 
+                   'c' + controlX1 + ' ' + controlY1 + ',' +
+                         controlX2 + ' ' + controlY2 + ',' +
+                         x2 + ' ' + y2;
+                   //'l' + x2    + ' ' + y2;
+
+
+
+            // Node is left of the parent
+            if (nX < pX){
+                startX  = nodeData.width;
+                endX    = tip;
+                parentX = diffX - tip;
+            }
+            else {
+                startX  = 0;
+                endX    = 0 - tip;
+                parentX = relativeX + parentData.width + endLength;
+            }
+
+            return 'm' + startX  + ' ' + nodeMidY +
+                   'l' + endX    + ' ' + 0 +
+                   'c' + (parentX) + ',' + parentX + ' ' + parentY +
+                   //'L' + parentX + ' ' + parentY +
+                   'l' + endX    + ' ' + 0;
+        },
+
+        xpathData: function(nodeData, parentData){
             var isLeft     = nodeData.x < parentData.x,
                 endLength  = this.NODE_PATH_END,
                 nodeMidY   = nodeData.height / 2,
