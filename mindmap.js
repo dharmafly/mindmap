@@ -48,7 +48,8 @@ var MindMap = (function(){
         },
 
         getById: function(id){
-            return this.svg.find('[data-id="' + id + '"]');
+            var node = this.svg.find('[data-id="' + id + '"]');
+            return node.length ? node : null;
         },
 
         userCreate: function(x, y){
@@ -90,18 +91,8 @@ var MindMap = (function(){
             // Generate a new id
             nodeId = this.idCounter ++;
 
-            // Find the parent node
-            if (parentId){
-                parent = this.getById(parentId);
-            }
-            // If no parent, then we're starting the mindmap
-            else {
-                // We'll add the node to the root SVG element
-                parent = this.svg;
-
-                // Remove the instructions text
-                this.removeInstructions();
-            }
+            // Find the parent node. For the first node, this is the SVG root
+            parent = this.getById(parentId) || this.svg;
 
             // Append a <g> group element to the parent to represent the 
             // mindmap node in the DOM
@@ -145,40 +136,38 @@ var MindMap = (function(){
                 */
                 this.paths[nodeId] = Pablo.path().prependTo(parent);
             }
+            else {
+                // This must be the first node, so remove the instructions text
+                this.removeInstructions();
+            }
 
             // Select the node and set its position
             return this.select(node)
                        .setPosition(node, x, y);
         },
 
-        setPosition: function(node, pageX, pageY){
-            // Position the node by 'translating' it
+        setPosition: function(node, x, y){
             var nodeId = this.getId(node),
                 nodeData = this.data(nodeId),
-                parentId = nodeData.parent,
-                parentData = this.data(parentId),
-                relX = pageX,
-                relY = pageY,
-                path;
-
-            // Make x & y relative to the parent
-            Pablo.extend(nodeData, {x:pageX, y:pageY});
+                parentData = this.data(nodeData.parent),
+                pathData;
 
             // Update stored data
+            Pablo.extend(nodeData, {x:x, y:y});
             this.data(nodeId, nodeData);
 
             if (parentData){
                 // Draw path from the parent to the node
-                path = this.paths[nodeId];
-                path.attr('d', this.pathData(parentData, nodeData));
+                pathData = this.pathData(parentData, nodeData);
+                this.paths[nodeId].attr('d', pathData);
 
-                // Calculate coordinates relative to the parent
-                relX = pageX - parentData.x;
-                relY = pageY - parentData.y;
+                // x and y are page coordinates -> make them relative to the parent
+                x -= parentData.x;
+                y -= parentData.y;
             }
 
             // Translate the node to the new coordinates
-            node.transform('translate', relX, relY);
+            node.transform('translate', x, y);
             return this;
         },
 
