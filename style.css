@@ -19,6 +19,16 @@ svg .node {
 
 svg .node text {
 	alignment-baseline: middle;
+
+	/* Prevent text selection highlighting on dragging.
+	   To achieve this via JavaScript:
+	       Pablo(textEl).cssPrefix('user-select', 'none');
+	*/
+	user-select: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
 }
 
 svg .node rect {
@@ -40,20 +50,11 @@ svg > .node > rect {
 }
 
 /* Selected */
-svg .node.selected > text {
-	fill: #d00;
-}
 svg .node.selected > rect {
 	fill: #fdd;
 	stroke: #d00;
 	stroke-width: 1;
 }
-
-/* Prevent text selection highlighting on dragging a node */
-svg.dragging text {
-	user-select: none;
-	-webkit-user-select: none;
-	-khtml-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
+svg .node.selected > text {
+	fill: #d00;
 }
