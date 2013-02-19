@@ -3,11 +3,6 @@
 var MindMap = (function(){
     'use strict';
 
-    // Check browser support
-    if (!Pablo.isSupported){
-        return;
-    }
-
     function MindMap(htmlContainer){
         var mindmap = this;
 
@@ -23,9 +18,23 @@ var MindMap = (function(){
                 mindmap['on' + event.type](event);
             });
 
+        /*
+        window.addEventListener('keydown', function(event){
+            var code = event.which,
+                node = Pablo(event.target);
+
+                console.log(event);
+            // Backspace / delete
+            if (node.hasClass('node') && code === 8 || code === 46){
+                mindmap.deleteNode(node);
+                event.preventDefault();
+                Event.stop();
+            }
+        });
+        */
+
         // Create lookup objects
         this.nodeData = {}; // data about each node
-        this.paths = {};    // path elements
 
         // Add instructions message
         this.addInstructions();
@@ -45,11 +54,6 @@ var MindMap = (function(){
 
         getId: function(node){
             return node && node.attr('data-id');
-        },
-
-        getById: function(id){
-            var node = this.svg.find('[data-id="' + id + '"]');
-            return node.length ? node : null;
         },
 
         userCreate: function(x, y){
@@ -76,27 +80,31 @@ var MindMap = (function(){
             return this;
         },
 
-        // Get or set node data in memory
-        data: function(id, data){
-            if (!data){
-                return this.nodeData[id];
-            }
-            this.nodeData[id] = data;
-            return this;
-        },
-
         drawNode: function(parentId, x, y, title){
-            var nodeId, parent, node, nodeData, text, textBBox;
+            var nodeId, parent, path, node, nodeData, text, textBBox;
 
-            // Generate a new id
+            // Generate a new id for the node
             nodeId = this.idCounter ++;
 
-            // Find the parent node. For the first node, this is the SVG root
-            parent = this.getById(parentId) || this.svg;
+            if (parentId){
+                // Find the parent node element
+                parent = this.nodeData[parentId].node;
+
+                // Create a <path> element that will visually connect the parent and
+                // node. The path's coordinates are set by the `setPosition` method.
+                path = Pablo.path().prependTo(parent);
+            }
+            else {
+                // This is the first node in the mindmap. Use the SVG root as the parent.
+                parent = this.svg;
+
+                // Remove the instructions text
+                this.removeInstructions();
+            }
 
             // Append a <g> group element to the parent to represent the 
             // mindmap node in the DOM
-            node = parent.g({'data-id': nodeId}).addClass('node');
+            node = parent.g({'data-id':nodeId}).addClass('node');
 
             // Create a <text> element and set its text content
             text = node.text({
@@ -111,14 +119,19 @@ var MindMap = (function(){
             // see also 
             textBBox = text[0].getBBox();
 
-            // Store data about the node in memory
+            // Store data about the node in a lookup object
+            // `x` and `y` are set by `setPosition`
+            // `width` and `height` are the <text> dimensions, plus padding
             nodeData = {
-                id: nodeId,
-                parent: parentId,
+                x:      x,
+                y:      y,
+                node:   node,
                 width:  textBBox.width  + this.NODE_PADDING_X * 2,
-                height: textBBox.height + this.NODE_PADDING_Y * 2
+                height: textBBox.height + this.NODE_PADDING_Y * 2,
+                parent: parentId,
+                path:   path
             };
-            this.data(nodeId, nodeData);
+            this.nodeData[nodeId] = nodeData;
 
             // Prepend a <rect> rectangle element to surround the text element
             // It is prepended so that the text appears on top
@@ -128,38 +141,25 @@ var MindMap = (function(){
                 rx: this.NODE_CORNER_R // rounded corners
             });
 
-            if (parentId){
-                /* Create a <path> element to visually connect the parent and node.
-                   The path's coordinates will be set in the `setPosition` method.
-                   We store the path in the `mindmap.paths` lookup object to maximise
-                   performance when dragging nodes and re-rendering the path's curve.
-                */
-                this.paths[nodeId] = Pablo.path().prependTo(parent);
-            }
-            else {
-                // This must be the first node, so remove the instructions text
-                this.removeInstructions();
-            }
-
             // Select the node and set its position
             return this.select(node)
-                       .setPosition(node, x, y);
+                       .setPosition(nodeId, x, y);
         },
 
-        setPosition: function(node, x, y){
-            var nodeId = this.getId(node),
-                nodeData = this.data(nodeId),
-                parentData = this.data(nodeData.parent),
+        setPosition: function(nodeId, x, y){
+            var nodeData = this.nodeData[nodeId],
+                node = nodeData.node,
+                parentData = this.nodeData[nodeData.parent],
                 pathData;
 
             // Update stored data
-            Pablo.extend(nodeData, {x:x, y:y});
-            this.data(nodeId, nodeData);
+            nodeData.x = x;
+            nodeData.y = y;
 
             if (parentData){
-                // Draw path from the parent to the node
-                pathData = this.pathData(parentData, nodeData);
-                this.paths[nodeId].attr('d', pathData);
+                // Set the path's curve between the parent and node
+                pathData = this.getPathData(parentData, nodeData);
+                nodeData.path.attr('d', pathData);
 
                 // x and y are page coordinates -> make them relative to the parent
                 x -= parentData.x;
@@ -173,7 +173,7 @@ var MindMap = (function(){
 
         // Draw a path from the parent to the child
         // p = parentData, n = nodeData
-        pathData: function(p, n){
+        getPathData: function(p, n){
             var isLeft  = p.x < n.x,
                 isAbove = p.y < n.y,
                 x1 = isLeft ? p.width : 0,
@@ -262,26 +262,25 @@ var MindMap = (function(){
         },
 
         dragStart: function(node, x, y){
-            var id = this.getId(node),
-                nodeData = this.nodeData[id];
+            var nodeId = this.getId(node),
+                nodeData = this.nodeData[nodeId];
 
+            // Store data about the node being dragged
             this.dragging = {
-                node: node,
+                id: nodeId,
                 offsetX: x - nodeData.x,
                 offsetY: y - nodeData.y
             };
-            this.svg.addClass('dragging');
             return this;
         },
 
         drag: function(x, y){
             var d = this.dragging;
-            return this.setPosition(d.node, x - d.offsetX, y - d.offsetY);
+            return this.setPosition(d.id, x - d.offsetX, y - d.offsetY);
         },
 
         dragStop: function(){
             this.dragging = null;
-            this.svg.removeClass('dragging');
             return this;
         }
     };
@@ -290,15 +289,19 @@ var MindMap = (function(){
     /////
 
 
-    var mm = new MindMap('#mindmap'),
-        svg = mm.svg;
 
-    mm.drawNode(null, 220, 300, 'Trees')
-      .drawNode(1, 100, 100, 'Birch')
-      .drawNode(1, 150, 500, 'Oak')
-      .drawNode(3, 10, 400, 'Larch')
-      .drawNode(1, 310, 230, 'Pine');
-    window.mm = mm;
+    // Check browser support
+    if (Pablo.isSupported){
+        var mm = new MindMap('#mindmap');
+
+        mm.drawNode(null, 220, 300, 'Trees')
+          .drawNode(1, 100, 100, 'Birch')
+          .drawNode(1, 150, 500, 'Oak')
+          .drawNode(3, 10, 400, 'Larch')
+          .drawNode(1, 310, 230, 'Pine');
+          
+        window.mm = mm;
+    }
 
 
     /////
