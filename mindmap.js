@@ -33,18 +33,18 @@ var MindMap = (function(){
         });
         */
 
-        // Create lookup objects
-        this.nodeData = {}; // data about each node
+        // Create a simple object cache in memory
+        this.cache = {}; // data about each node
 
         // Add instructions message
         this.addInstructions();
     }
 
     MindMap.prototype = {
-        NODE_PADDING_X: 8,
-        NODE_PADDING_Y: 5,
-        NODE_CORNER_R: 5,
-        NODE_FONT_SIZE: 20,
+        PADDING_X: 8,
+        PADDING_Y: 5,
+        CORNER_R: 5,
+        FONTSIZE: 20,
         PATH_CURVE: 30,
         idCounter: 1,
 
@@ -56,6 +56,21 @@ var MindMap = (function(){
             return node && node.attr('data-id');
         },
 
+        // Add a <text> element with instructions
+        addInstructions: function(){
+            this.svg.text({x:'50%', y:'50%'})
+                    .addClass('instructions')
+                    .content('Click anywhere to create nodes\nClick a node to select');
+            return this;
+        },
+
+        // Remove the instructions <text> element
+        removeInstructions: function(){
+            this.svg.find('.instructions').remove();
+            return this;
+        },
+
+        // Ask the user what text to put in a new node
         userCreate: function(x, y){
             var title = this.trim(window.prompt('What\'s the text?')),
                 parentId = this.getId(this.selected);
@@ -66,108 +81,127 @@ var MindMap = (function(){
             return this;
         },
 
-        // Add a <text> element with instructions
-        addInstructions: function(){
-            this.svg.text({x:'50%', y:'50%'})
-                    .addClass('instructions')
-                    .content('Click anywhere to create nodes');
-            return this;
-        },
-
-        // Remove the instructions <text> element
-        removeInstructions: function(){
-            Pablo('.instructions').remove();
-            return this;
-        },
-
         drawNode: function(parentId, x, y, title){
-            var nodeId, parent, path, node, nodeData, text, textBBox;
+            var nodeId, parent, path, node, nodeData, text, rect, textBBox;
 
             // Generate a new id for the node
             nodeId = this.idCounter ++;
 
-            if (parentId){
-                // Find the parent node element
-                parent = this.nodeData[parentId].node;
-
-                // Create a <path> element that will visually connect the parent and
-                // node. The path's coordinates are set by the `setPosition` method.
-                path = Pablo.path().prependTo(parent);
-            }
-            else {
-                // This is the first node in the mindmap. Use the SVG root as the parent.
-                parent = this.svg;
-
-                // Remove the instructions text
+            // Remove the instructions text
+            if (!parentId) {
                 this.removeInstructions();
             }
 
-            // Append a <g> group element to the parent to represent the 
-            // mindmap node in the DOM
-            node = parent.g({'data-id':nodeId}).addClass('node');
-
-            // Create a <text> element and set its text content
-            text = node.text({
-                    x: this.NODE_PADDING_X,
-                    y: this.NODE_FONT_SIZE,
-                    'font-size': this.NODE_FONT_SIZE
-                })
-                .content(title);
-
-            // Get the text's rendered dimensions
-            // getBBox is a very useful native SVG DOM method
-            // see also 
-            textBBox = text[0].getBBox();
-
             // Store data about the node in a lookup object
-            // `x` and `y` are set by `setPosition`
-            // `width` and `height` are the <text> dimensions, plus padding
-            nodeData = {
-                x:      x,
-                y:      y,
-                node:   node,
-                width:  textBBox.width  + this.NODE_PADDING_X * 2,
-                height: textBBox.height + this.NODE_PADDING_Y * 2,
-                parent: parentId,
-                path:   path
+            nodeData = this.cache[nodeId] = {
+                id:nodeId, parentId:parentId,
+                x:x, y:y,
+                title:title
             };
-            this.nodeData[nodeId] = nodeData;
 
-            // Prepend a <rect> rectangle element to surround the text element
-            // It is prepended so that the text appears on top
-            node.prepend('rect', {
-                width:  nodeData.width,
-                height: nodeData.height,
-                rx: this.NODE_CORNER_R // rounded corners
-            });
 
-            // Select the node and set its position
-            return this.select(node)
-                       .setPosition(nodeId, x, y);
+
+            // Select the node, update its text and position
+            return this.createNodeElements(nodeData)
+                       .select(nodeId)
+                       .updateText(nodeData, title)
+                       .updatePosition(nodeData, x, y);
         },
 
-        setPosition: function(nodeId, x, y){
-            var nodeData = this.nodeData[nodeId],
-                node = nodeData.node,
-                parentData = this.nodeData[nodeData.parent],
+        createNodeElements: function(nodeData){
+            var parentId = nodeData.parentId,
+                parentData = this.cache[parentId],
+                parent, path, node, rect, text;
+
+            // If there's no parent (e.g. for the first node), append to the SVG root
+            parent = parentData ?
+                parentData.node : this.svg;
+
+            // Append a <g> group element to the parent to represent the 
+            // mindmap node in the DOM
+            node = parent.g({'data-id': nodeData.id}).addClass('node');
+
+            // Append a <rect> rectangle element, with rounded corners
+            rect = node.rect({rx: this.CORNER_R});
+
+            // Append a <text> element, with padding
+            text = node.text({
+                x: this.PADDING_X,
+                y: this.FONTSIZE,
+                'font-size': this.FONTSIZE
+            });
+
+            // Create a <path> element to visually connect the parent and node.
+            // Its coordinates are set by the `updatePosition` method.
+            // We prepend it so that it appears beneath the parent's rectangle.
+            path = parentId ?
+                Pablo.path().prependTo(parent) : null;
+
+
+            // Extend the cached lookup object to give quick access to the elements
+            Pablo.extend(nodeData, {node:node, rect:rect, text:text, path:path});
+
+            return this;
+        },
+
+        updateText: function(nodeData, title){
+            var text = nodeData.text,
+                rect = nodeData.rect,
+                bbox, nodeDimensions;
+
+            // Set the text element's contents
+            text.content(title);
+
+            // Get the text's rendered dimensions. `getBBox()` is a native SVG DOM method
+            bbox = text[0].getBBox();
+            
+            // Add padding for the rectangle's dimensions and update the node data
+            nodeDimensions = {
+                width:  bbox.width + this.PADDING_X * 2,
+                height: bbox.height + this.PADDING_Y * 2
+            };
+
+            // Update the cached data and apply to the <rect> element
+            Pablo.extend(nodeData, nodeDimensions);
+            rect.attr(nodeDimensions);
+
+            return this;
+        },
+
+        updatePosition: function(nodeData, x, y){
+            var node = nodeData.node,
+                parentData = this.cache[nodeData.parentId],
                 pathData;
 
             // Update stored data
             nodeData.x = x;
             nodeData.y = y;
 
+            // x and y are initially page coordinates -> make them relative to the parent
             if (parentData){
-                // Set the path's curve between the parent and node
-                pathData = this.getPathData(parentData, nodeData);
-                nodeData.path.attr('d', pathData);
-
-                // x and y are page coordinates -> make them relative to the parent
                 x -= parentData.x;
                 y -= parentData.y;
             }
 
             // Translate the node to the new coordinates
             node.transform('translate', x, y);
+
+            // Update the path drawn between the parent and node
+            return this.updatePath(parentData, nodeData);
+        },
+
+        updatePath: function(parentData, nodeData){
+            // Get the <path> element
+            var path = nodeData.path,
+                pathData;
+
+            if (path){
+                // Calculate the curve between the parent and node
+                pathData = this.getPathData(parentData, nodeData)
+
+                // Set the element's `d` (data) attribute with the path data
+                path.attr('d', pathData);
+            }
             return this;
         },
 
@@ -188,7 +222,9 @@ var MindMap = (function(){
                    'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
         },
 
-        select: function(node){
+        select: function(nodeId){
+            var node = this.cache[nodeId].node;
+
             // De-selected currently selected node
             if (this.selected){
                 this.selected.removeClass('selected');
@@ -211,7 +247,7 @@ var MindMap = (function(){
         },
 
         onmousedown: function(event){
-            var node, x, y;
+            var nodeId, node, x, y;
 
             // left button click
             if (event.which === 1){
@@ -220,7 +256,8 @@ var MindMap = (function(){
                 y = event.pageY;
 
                 if (node.length){
-                    this.select(node);
+                    nodeId = node.attr('data-id');
+                    this.select(nodeId);
                     this.dragStart(node, x, y);
                 }
                 else {
@@ -263,20 +300,28 @@ var MindMap = (function(){
 
         dragStart: function(node, x, y){
             var nodeId = this.getId(node),
-                nodeData = this.nodeData[nodeId];
+                nodeData = this.cache[nodeId];
 
             // Store data about the node being dragged
+            // The offset is the distance between the node's x,y origin and the mouse cursor
             this.dragging = {
-                id: nodeId,
-                offsetX: x - nodeData.x,
-                offsetY: y - nodeData.y
+                nodeData: nodeData,
+                offsetX:  x - nodeData.x,
+                offsetY:  y - nodeData.y
             };
             return this;
         },
 
         drag: function(x, y){
+            // Retrieve the stored data about the node being dragged
             var d = this.dragging;
-            return this.setPosition(d.id, x - d.offsetX, y - d.offsetY);
+
+            // Remove the offset between the node's x,y origin and the mouse cursor
+            x -= d.offsetX;
+            y -= d.offsetY;
+
+            // Update the node's position
+            return this.updatePosition(d.nodeData, x, y);
         },
 
         dragStop: function(){
