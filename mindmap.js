@@ -29,7 +29,6 @@ var MindMap = (function(){
         PADDING_X: 8,
         PADDING_Y: 5,
         CORNER_R: 5,
-        FONTSIZE: 20,
         PATH_CURVE: 30,
         idCounter: 1,
 
@@ -110,8 +109,7 @@ var MindMap = (function(){
             // Append a <text> element, with padding
             text = node.text({
                 x: this.PADDING_X,
-                y: this.FONTSIZE,
-                'font-size': this.FONTSIZE
+                y: 0
             });
 
             // Create a <path> element to visually connect the parent and node.
@@ -140,7 +138,8 @@ var MindMap = (function(){
             // Add padding for the rectangle's dimensions and update the node data
             nodeDimensions = {
                 width:  bbox.width + this.PADDING_X * 2,
-                height: bbox.height + this.PADDING_Y * 2
+                height: bbox.height + this.PADDING_Y * 2,
+                y: 0 - this.PADDING_Y
             };
 
             // Update the cached data and apply to the <rect> element
@@ -331,14 +330,14 @@ var MindMap = (function(){
         var mm = new MindMap('#mindmap');
 
         // TEST DATA
-        /*
+        /**/
         mm.drawNode(null, 220, 300, 'Trees')
           .drawNode(1, 100, 100, 'Birch')
           .drawNode(1, 150, 500, 'Oak')
-          .drawNode(3, 10, 400, 'Larch')
+          .drawNode(3, 10, 400, 'Acorn')
           .drawNode(1, 310, 230, 'Pine');
         window.mm = mm;
-        */
+        /**/
     }
 
 

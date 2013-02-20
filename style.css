@@ -1,28 +1,34 @@
+/* Containers */
 body {
 	margin: 0;
 	padding: 0;
 }
-
 svg {
 	font-family: sans-serif;
 }
 
+/* Meta */
 .instructions {
 	font-size: 2em;
 	text-anchor: middle;
-	alignment-baseline: middle;
+	alignment-baseline: before-edge;
 }
 
+/* Node */
 svg .node {
 	cursor: pointer;
 }
 
 svg .node text {
-	alignment-baseline: middle;
+	fill: #000;
+	alignment-baseline: before-edge;
+	font-size: 1.6em;
 
-	/* Prevent text selection highlighting on dragging.
-	   To achieve this via JavaScript:
-	       Pablo(textEl).cssPrefix('user-select', 'none');
+	/* Prevent text selection highlighting on dragging. And add browser 
+	   vendor prefixes, e.g. `-moz-user-select`. To alternatively use JavaScript 
+	   to apply vendor-prefixed styles to a collection of elements, using Pablo:
+
+	       Pablo(element).cssPrefix('user-select', 'none');
 	*/
 	user-select: none;
 	-webkit-user-select: none;
@@ -30,31 +36,30 @@ svg .node text {
 	-moz-user-select: none;
 	-ms-user-select: none;
 }
-
 svg .node rect {
 	fill: none;
 	stroke: none;
-	stroke-width: 2;
+	stroke-width: 1;
+	rx: 10
 }
-
 svg .node path {
-	stroke: darkgreen;
+	stroke: #e50000;
 	stroke-width: 2;
 	fill: none;
 }
 
-/* Hub */
+/* Root node */
 svg > .node > rect {
-	fill: lightgreen;
-	stroke: darkgreen;
+	fill: #333;
+}
+svg > .node > text {
+	fill: #fff;
 }
 
-/* Selected */
+/* Selected node */
 svg .node.selected > rect {
-	fill: #fdd;
-	stroke: #d00;
-	stroke-width: 1;
+	fill: #e50000;
 }
 svg .node.selected > text {
-	fill: #d00;
+	fill: #fff;
 }
