@@ -21,8 +21,6 @@ svg .node {
 
 svg .node text {
 	fill: #000;
-	alignment-baseline: before-edge;
-	font-size: 1.6em;
 
 	/* Prevent text selection highlighting on dragging. And add browser 
 	   vendor prefixes, e.g. `-moz-user-select`. To alternatively use JavaScript 
@@ -40,7 +38,6 @@ svg .node rect {
 	fill: none;
 	stroke: none;
 	stroke-width: 1;
-	rx: 10
 }
 svg .node path {
 	stroke: #e50000;

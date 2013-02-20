@@ -10,8 +10,8 @@ var MindMap = (function(){
         this.svg = Pablo(htmlContainer).svg({
                 // Alternatively, specify `svg {width:100%; height:100%;}`
                 // in the CSS stylesheet
-                width: '100%',
-                height: '100%'
+                width: window.innerWidth,
+                height: window.innerHeight
             })
             // Set up event handlers - see mindmap.onmousedown(), etc
             .on('mousedown mousemove mouseup mouseout', function(event){
@@ -28,8 +28,9 @@ var MindMap = (function(){
     MindMap.prototype = {
         PADDING_X: 8,
         PADDING_Y: 5,
-        CORNER_R: 5,
+        CORNER_R: 7,
         PATH_CURVE: 30,
+        FONTSIZE: 20,
         idCounter: 1,
 
         trim: function(str){
@@ -103,13 +104,17 @@ var MindMap = (function(){
             // mindmap node in the DOM
             node = parent.g({'data-id': nodeData.id}).addClass('node');
 
-            // Append a <rect> rectangle element, with rounded corners
+            // Append a <rect> rectangle element
             rect = node.rect({rx: this.CORNER_R});
 
             // Append a <text> element, with padding
             text = node.text({
                 x: this.PADDING_X,
-                y: 0
+                // TODO: remove hack; why 2? - better vertical alignment preferable
+                //       Chrome supports `alignment-baseline: before-text` / `baseline`
+                //       but Firefox does not
+                y: this.FONTSIZE - 2,
+                'font-size': this.FONTSIZE
             });
 
             // Create a <path> element to visually connect the parent and node.
@@ -330,14 +335,14 @@ var MindMap = (function(){
         var mm = new MindMap('#mindmap');
 
         // TEST DATA
-        /**/
+        /*
         mm.drawNode(null, 220, 300, 'Trees')
           .drawNode(1, 100, 100, 'Birch')
           .drawNode(1, 150, 500, 'Oak')
           .drawNode(3, 10, 400, 'Acorn')
           .drawNode(1, 310, 230, 'Pine');
         window.mm = mm;
-        /**/
+        */
     }
 
 
