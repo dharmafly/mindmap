@@ -18,21 +18,6 @@ var MindMap = (function(){
                 mindmap['on' + event.type](event);
             });
 
-        /*
-        window.addEventListener('keydown', function(event){
-            var code = event.which,
-                node = Pablo(event.target);
-
-                console.log(event);
-            // Backspace / delete
-            if (node.hasClass('node') && code === 8 || code === 46){
-                mindmap.deleteNode(node);
-                event.preventDefault();
-                Event.stop();
-            }
-        });
-        */
-
         // Create a simple object cache in memory
         this.cache = {}; // data about each node
 
@@ -60,7 +45,7 @@ var MindMap = (function(){
         addInstructions: function(){
             this.svg.text({x:'50%', y:'50%'})
                     .addClass('instructions')
-                    .content('Click anywhere to create nodes\nClick a node to select');
+                    .content('Click anywhere to create nodes');
             return this;
         },
 
@@ -99,13 +84,11 @@ var MindMap = (function(){
                 title:title
             };
 
-
-
-            // Select the node, update its text and position
+            // Update the node's text and position, and mark it `selected`
             return this.createNodeElements(nodeData)
-                       .select(nodeId)
                        .updateText(nodeData, title)
-                       .updatePosition(nodeData, x, y);
+                       .updatePosition(nodeData, x, y)
+                       .makeSelected(nodeId);
         },
 
         createNodeElements: function(nodeData){
@@ -136,7 +119,6 @@ var MindMap = (function(){
             // We prepend it so that it appears beneath the parent's rectangle.
             path = parentId ?
                 Pablo.path().prependTo(parent) : null;
-
 
             // Extend the cached lookup object to give quick access to the elements
             Pablo.extend(nodeData, {node:node, rect:rect, text:text, path:path});
@@ -206,7 +188,7 @@ var MindMap = (function(){
         },
 
         // Draw a path from the parent to the child
-        // p = parentData, n = nodeData
+        // `p` = parentData, `n` = nodeData
         getPathData: function(p, n){
             var isLeft  = p.x < n.x,
                 isAbove = p.y < n.y,
@@ -222,7 +204,7 @@ var MindMap = (function(){
                    'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
         },
 
-        select: function(nodeId){
+        makeSelected: function(nodeId){
             var node = this.cache[nodeId].node;
 
             // De-selected currently selected node
@@ -239,6 +221,15 @@ var MindMap = (function(){
 
             return this;
         },
+
+        /*
+        removeNode: function(nodeData){
+            nodeData.node.remove();
+            nodeData.path.remove();
+            delete this.cache[nodeData.id];
+            return this;
+        },
+        */
 
         nearestNode: function(el){
             var node = Pablo(el);
@@ -257,7 +248,7 @@ var MindMap = (function(){
 
                 if (node.length){
                     nodeId = node.attr('data-id');
-                    this.select(nodeId);
+                    this.makeSelected(nodeId);
                     this.dragStart(node, x, y);
                 }
                 else {
@@ -339,13 +330,15 @@ var MindMap = (function(){
     if (Pablo.isSupported){
         var mm = new MindMap('#mindmap');
 
+        // TEST DATA
+        /*
         mm.drawNode(null, 220, 300, 'Trees')
           .drawNode(1, 100, 100, 'Birch')
           .drawNode(1, 150, 500, 'Oak')
           .drawNode(3, 10, 400, 'Larch')
           .drawNode(1, 310, 230, 'Pine');
-          
         window.mm = mm;
+        */
     }
 
 
