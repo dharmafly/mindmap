@@ -45,18 +45,19 @@ svg .node path {
 	fill: none;
 }
 
+/* Selected node */
+svg .node.selected > rect {
+	stroke: #e50000;
+	fill: #fff;
+}
+svg .node.selected > text {
+	fill: #e50000;
+}
+
 /* Root node */
-svg > .node > rect {
+svg > .node > rect, svg > .node.selected > rect {
 	fill: #333;
 }
 svg > .node > text {
-	fill: #fff;
-}
-
-/* Selected node */
-svg .node.selected > rect {
-	fill: #e50000;
-}
-svg .node.selected > text {
 	fill: #fff;
 }

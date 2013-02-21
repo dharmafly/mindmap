@@ -11,5 +11,12 @@
 
         <script src="pablo.js"></script>
         <script src="mindmap.js?v3"></script>
+
+        <script>
+            // Check browser support
+            if (Pablo.isSupported){
+                new MindMap('#mindmap');
+            }
+        </script>
     </body>
 </html>
