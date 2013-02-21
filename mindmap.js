@@ -66,11 +66,13 @@ var MindMap = (function(){
             return this;
         },
 
-        drawNode: function(parentId, x, y, title){
+        drawNode: function(parentId, x, y, title, nodeId){
             var nodeId, parent, path, node, nodeData, text, rect, textBBox;
 
             // Generate a new id for the node
-            nodeId = this.idCounter ++;
+            if (!nodeId){
+                nodeId = this.idCounter ++;
+            }
 
             // Remove the instructions text
             if (!parentId) {
@@ -226,15 +228,6 @@ var MindMap = (function(){
             return this;
         },
 
-        /*
-        removeNode: function(nodeData){
-            nodeData.node.remove();
-            nodeData.path.remove();
-            delete this.cache[nodeData.id];
-            return this;
-        },
-        */
-
         nearestNode: function(el){
             var node = Pablo(el);
             return node.hasClass('node') ?
@@ -324,26 +317,6 @@ var MindMap = (function(){
             return this;
         }
     };
-
-    
-    /////
-
-
-
-    // Check browser support
-    if (Pablo.isSupported){
-        var mm = new MindMap('#mindmap');
-
-        // TEST DATA
-        /*
-        mm.drawNode(null, 220, 300, 'Trees')
-          .drawNode(1, 100, 100, 'Birch')
-          .drawNode(1, 150, 500, 'Oak')
-          .drawNode(3, 10, 400, 'Acorn')
-          .drawNode(1, 310, 230, 'Pine');
-        window.mm = mm;
-        */
-    }
 
 
     /////
