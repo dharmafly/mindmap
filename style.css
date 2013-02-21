@@ -50,9 +50,6 @@ svg .node.selected > rect {
 	stroke: #e50000;
 	fill: #fff;
 }
-svg .node.selected > text {
-	fill: #e50000;
-}
 
 /* Root node */
 svg > .node > rect, svg > .node.selected > rect {
@@ -60,4 +57,7 @@ svg > .node > rect, svg > .node.selected > rect {
 }
 svg > .node > text {
 	fill: #fff;
+}
+svg > .node.selected > text {
+	fill: #e50000;
 }

@@ -89,8 +89,8 @@ var MindMap = (function(){
             // Update the node's text and position, and mark it `selected`
             return this.createNodeElements(nodeData)
                        .updateText(nodeData, title)
-                       .updatePosition(nodeData, x, y)
-                       .makeSelected(nodeId);
+                       .updatePosition(nodeData, x, y);
+                       //.makeSelected(nodeId);
         },
 
         createNodeElements: function(nodeData){
