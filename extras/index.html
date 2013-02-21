@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <title>Mind Map</title>
+        <link rel="stylesheet" href="../style.css?v3">
+    </head>
+    <body>
+        <section id="mindmap"></section>
+
+        <script src="../pablo.js"></script>
+        <script src="../mindmap.js?v3"></script>
+        <script src="../extras/localstorage.js"></script>
+        <script src="../extras/delete.js"></script>
+
+        <script>
+            // Check browser support
+            if (Pablo.isSupported){
+                var mm = new MindMap('#mindmap');
+            }
+        </script>
+    </body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <title>Mind Map</title>
+        <link rel="stylesheet" href="../style.css?v3">
+    </head>
+    <body>
+        <section id="mindmap"></section>
+
+        <script src="../pablo.js"></script>
+        <script src="../mindmap.js?v3"></script>
+        <script src="../extras/localstorage.js"></script>
+
+        <script>
+            // Check browser support
+            if (Pablo.isSupported){
+                var mm = new MindMap('#mindmap');
+
+                mm.drawNode(null, 220, 300, 'Trees')
+                  .drawNode(1, 100, 100, 'Birch')
+                  .drawNode(1, 150, 500, 'Oak')
+                  .drawNode(3, 10, 400, 'Acorn')
+                  .drawNode(1, 310, 230, 'Pine');
+            }
+        </script>
+    </body>
+</html>
