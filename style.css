@@ -7,7 +7,7 @@ svg {
 	font-family: sans-serif;
 }
 
-/* Meta */
+/* Text about the app */
 .instructions {
 	font-size: 30px;
 }
@@ -20,9 +20,9 @@ svg {
 .node text {
 	fill: #000;
 
-	/* Prevent text selection highlighting on dragging. And add browser 
-	   vendor prefixes, e.g. `-moz-user-select`. To alternatively use JavaScript 
-	   to apply vendor-prefixed styles to a collection of elements, using Pablo:
+	/* Prevent text selection highlighting on dragging. And add browser vendor prefixes,
+	   e.g. `-moz-user-select`. To alternatively use one line of JavaScript to apply 
+	   vendor-prefixed styles to a collection of elements, using Pablo:
 
 	       Pablo(element).cssPrefix('user-select', 'none');
 	*/
@@ -35,22 +35,27 @@ svg {
 .node rect {
 	fill: none;
 	stroke: none;
-	stroke-width: 1;
 }
 .node path {
+	fill: none;
 	stroke: #e50000;
 	stroke-width: 2;
-	fill: none;
+	stroke-linecap: round;
 }
 
-/* Selected node */
+/* Selected node:
+   style the <rect> that is a direct child of the node (i.e. not <rect>'s
+   belonging to child nodes)
+*/
 .node.selected > rect {
-	stroke: #e50000;
 	fill: #fff;
+	stroke: #e50000;
+	stroke-width: 1;
 }
 
-/* Mindmap first node */
-svg > .node > rect, svg > .node.selected > rect {
+/* Different styles for the first node */
+svg > .node > rect, 
+svg > .node.selected > rect {
 	fill: #333;
 }
 svg > .node > text {
