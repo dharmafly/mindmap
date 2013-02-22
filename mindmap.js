@@ -36,24 +36,6 @@ var MindMap = (function(){
             return node && node.attr('data-id');
         },
 
-        // Add a <text> element with instructions
-        addInstructions: function(){
-            this.svg.text({x:10, y:50})
-                    .addClass('instructions')
-                    .content('Click anywhere to create nodes.');
-
-            this.svg.text({x:10, y:90})
-                    .addClass('instructions')
-                    .content('Click a node to select as the next parent.')
-            return this;
-        },
-
-        // Remove the instructions <text> element
-        removeInstructions: function(){
-            this.svg.find('.instructions').remove();
-            return this;
-        },
-
         // Ask the user what text to put in a new node
         userCreate: function(x, y){
             var title = window.prompt("What's the text?") || '',
@@ -90,12 +72,12 @@ var MindMap = (function(){
             };
 
             // Update the node's text and position, and mark it `selected`
-            return this.createNodeElements(nodeData)
+            return this.createElements(nodeData)
                        .updateText(nodeData, title)
                        .updatePosition(nodeData, x, y);
         },
 
-        createNodeElements: function(nodeData){
+        createElements: function(nodeData){
             var parentId = nodeData.parentId,
                 parentData = this.cache[parentId],
                 parent, path, node, rect, text;
@@ -227,6 +209,24 @@ var MindMap = (function(){
                 // Bring to front, to prevent the node being dragged behind another node
                 .appendTo(node.parent());
 
+            return this;
+        },
+
+        // Add a <text> element with instructions
+        addInstructions: function(){
+            this.svg.text({x:10, y:50})
+                    .addClass('instructions')
+                    .content('Click anywhere to create nodes.');
+
+            this.svg.text({x:10, y:90})
+                    .addClass('instructions')
+                    .content('Click a node to select as the next parent.')
+            return this;
+        },
+
+        // Remove the instructions <text> element
+        removeInstructions: function(){
+            this.svg.find('.instructions').remove();
             return this;
         },
 

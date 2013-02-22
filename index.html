@@ -10,12 +10,13 @@
         <section id="mindmap"></section>
 
         <script src="pablo.js"></script>
-        <script src="mindmap.js?v3"></script>
+        <script src="mindmap.js?v4"></script>
 
         <script>
             // Check browser support
             if (Pablo.isSupported){
-                new MindMap('#mindmap');
+                var mm = new MindMap('#mindmap');
+                // You can play with the `mm` object in the browser developer console
             }
         </script>
     </body>
