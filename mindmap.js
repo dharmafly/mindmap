@@ -134,8 +134,9 @@ var MindMap = (function(){
             bbox = text[0].getBBox();
             
             // Add padding for the rectangle's dimensions and update the node data
+            // TODO: explain why 2*x but only 1*y; it's due to text baseline position and text x position having padding already applied
             nodeData.width  = bbox.width + this.PADDING_X * 2;
-            nodeData.height = bbox.height + this.PADDING_Y * 2;
+            nodeData.height = bbox.height + this.PADDING_Y;
 
             // Update the cached data and apply to the <rect> element
             rect.attr({
