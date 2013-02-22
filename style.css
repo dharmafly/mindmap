@@ -9,17 +9,15 @@ svg {
 
 /* Meta */
 .instructions {
-	font-size: 2em;
-	text-anchor: middle;
-	alignment-baseline: before-edge;
+	font-size: 30px;
 }
 
 /* Node */
-svg .node {
+.node {
 	cursor: pointer;
 }
 
-svg .node text {
+.node text {
 	fill: #000;
 
 	/* Prevent text selection highlighting on dragging. And add browser 
@@ -34,24 +32,24 @@ svg .node text {
 	-moz-user-select: none;
 	-ms-user-select: none;
 }
-svg .node rect {
+.node rect {
 	fill: none;
 	stroke: none;
 	stroke-width: 1;
 }
-svg .node path {
+.node path {
 	stroke: #e50000;
 	stroke-width: 2;
 	fill: none;
 }
 
 /* Selected node */
-svg .node.selected > rect {
+.node.selected > rect {
 	stroke: #e50000;
 	fill: #fff;
 }
 
-/* Root node */
+/* Mindmap first node */
 svg > .node > rect, svg > .node.selected > rect {
 	fill: #333;
 }

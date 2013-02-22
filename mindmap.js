@@ -38,9 +38,13 @@ var MindMap = (function(){
 
         // Add a <text> element with instructions
         addInstructions: function(){
-            this.svg.text({x:'50%', y:'50%'})
+            this.svg.text({x:10, y:50})
                     .addClass('instructions')
-                    .content('Click anywhere to create nodes');
+                    .content('Click anywhere to create nodes.');
+
+            this.svg.text({x:10, y:90})
+                    .addClass('instructions')
+                    .content('Click a node to select as the next parent.')
             return this;
         },
 
@@ -167,6 +171,9 @@ var MindMap = (function(){
             if (parentData){
                 x -= parentData.x;
                 y -= parentData.y;
+
+                nodeData.relX = x;
+                nodeData.relY = y;
             }
 
             // Translate the node to the new coordinates
@@ -264,7 +271,7 @@ var MindMap = (function(){
 
         setupEvents: function(){
             var mindmap = this;
-            
+
             this.svg
                 .on('mousedown', function(event){
                     var nodeId, node, x, y;
