@@ -167,9 +167,6 @@ var MindMap = (function(){
             if (parentData){
                 x -= parentData.x;
                 y -= parentData.y;
-
-                nodeData.relX = x;
-                nodeData.relY = y;
             }
 
             // Translate the node to the new coordinates
