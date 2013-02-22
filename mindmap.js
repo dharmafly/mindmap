@@ -49,20 +49,15 @@ var MindMap = (function(){
             return this;
         },
 
-        getRelativeCoords: function(parentId, pageX, pageY){
-            var parentData = this.cache[parentId],
-                dx = pageX,
-                dy = pageY;
-
-            while (parentData){
-                dx -= parentData.dx;
-                dy -= parentData.dy;
-                parentData = this.cache[parentData.parentId];
+        getRelativeCoords: function(nodeData, x, y){
+            while (nodeData = this.cache[nodeData.parentId]){
+                x -= nodeData.dx;
+                y -= nodeData.dy;
             }
-            return {x:dx, y:dy};
+            return {x:x, y:y};
         },
 
-        drawNode: function(parentId, pageX, pageY, title, nodeId){
+        drawNode: function(parentId, x, y, title, nodeId){
             var nodeId, nodeData, delta;
 
             // Generate a new id for the node
@@ -70,7 +65,8 @@ var MindMap = (function(){
                 nodeId = this.idCounter ++;
             }
 
-            // Remove the instructions text
+            // Remove the instructions text, since this is the first node
+            // TODO: this shouldn't be here!
             if (!parentId) {
                 this.removeInstructions();
             }
@@ -83,7 +79,7 @@ var MindMap = (function(){
             };
 
             // Calculate x, y coordinates relative to the parent node
-            delta = this.getRelativeCoords(parentId, pageX, pageY);
+            delta = this.getRelativeCoords(nodeData, x, y);
 
             // Update the node's text and position, and mark it `selected`
             return this.createElements(nodeData)
@@ -240,25 +236,25 @@ var MindMap = (function(){
                 node : node.parents('.node').first();
         },
 
-        dragStart: function(nodeId, pageX, pageY){
+        dragStart: function(nodeId, x, y){
             var nodeData = this.cache[nodeId];
 
             // Store data about the node being dragged
             // The offset is the distance between the node's x,y origin and the mouse cursor
             this.dragging = {
                 nodeData: nodeData,
-                offsetX: pageX - nodeData.dx,
-                offsetY: pageY - nodeData.dy
+                offsetX: x - nodeData.dx,
+                offsetY: y - nodeData.dy
             };
             return this;
         },
 
-        drag: function(pageX, pageY){
+        drag: function(x, y){
             // Retrieve the stored data about the node being dragged
             var d = this.dragging,
                 // Remove the offset between the node's x,y origin and the mouse cursor
-                dx = pageX -= d.offsetX,
-                dy = pageY -= d.offsetY;
+                dx = x -= d.offsetX,
+                dy = y -= d.offsetY;
 
             // Update the node's position
             return this.updatePosition(d.nodeData, dx, dy);
