@@ -33,10 +33,6 @@ var MindMap = (function(){
         FONTSIZE: 20,
         idCounter: 1,
 
-        trim: function(str){
-            return str ? str.replace(/^\s\s*/, '').replace(/\s\s*$/, '') : '';
-        },
-
         getId: function(node){
             return node && node.attr('data-id');
         },
@@ -57,9 +53,11 @@ var MindMap = (function(){
 
         // Ask the user what text to put in a new node
         userCreate: function(x, y){
-            var title = this.trim(window.prompt('What\'s the text?')),
-                parentId = this.getId(this.selected);
+            var title = window.prompt("What's the text?") || '',
+                parent = this.selected || this.svg.find('.node').eq(0),
+                parentId = this.getId(parent);
 
+            title = title.trim();
             if (title){
                 this.drawNode(parentId, x, y, title);
             }
@@ -81,16 +79,17 @@ var MindMap = (function(){
 
             // Store data about the node in a lookup object
             nodeData = this.cache[nodeId] = {
-                id:nodeId, parentId:parentId,
-                x:x, y:y,
-                title:title
+                id: nodeId,
+                parentId: parentId,
+                title: title,
+                x: x,
+                y: y
             };
 
             // Update the node's text and position, and mark it `selected`
             return this.createNodeElements(nodeData)
                        .updateText(nodeData, title)
                        .updatePosition(nodeData, x, y);
-                       //.makeSelected(nodeId);
         },
 
         createNodeElements: function(nodeData){
@@ -163,12 +162,15 @@ var MindMap = (function(){
 
             // Update stored data
             nodeData.x = x;
-            nodeData.y = y;
+            nodeData.y = y; 
 
             // x and y are initially page coordinates -> make them relative to the parent
             if (parentData){
                 x -= parentData.x;
                 y -= parentData.y;
+
+                nodeData.relX = x;
+                nodeData.relY = y;
             }
 
             // Translate the node to the new coordinates
@@ -246,7 +248,7 @@ var MindMap = (function(){
                 if (node.length){
                     nodeId = node.attr('data-id');
                     this.makeSelected(nodeId);
-                    this.dragStart(node, x, y);
+                    this.dragStart(nodeId, x, y);
                 }
                 else {
                     this.userCreate(x, y);
@@ -286,9 +288,8 @@ var MindMap = (function(){
             }
         },
 
-        dragStart: function(node, x, y){
-            var nodeId = this.getId(node),
-                nodeData = this.cache[nodeId];
+        dragStart: function(nodeId, x, y){
+            var nodeData = this.cache[nodeId];
 
             // Store data about the node being dragged
             // The offset is the distance between the node's x,y origin and the mouse cursor
