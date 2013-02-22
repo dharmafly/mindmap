@@ -5,3 +5,10 @@ reader participation:
 - take screenshots
 - allow local save and upload data
 - pull requests to a repo or folder
+
+
+/////
+
+BUGS
+
+On moving a parent, then moving the child, the position jumps. This is because the cached data is not updated for children when their parent's update.

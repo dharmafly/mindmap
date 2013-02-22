@@ -6,6 +6,8 @@
 	}
 
 	Pablo.extend(MindMap.prototype, {
+		// LOCAL STORAGE
+
 		LOCALSTORAGE_PREFIX: 'mindful-',
 
 		getLocalStorage: function(key){
@@ -61,6 +63,17 @@
 			// Start counter after last id
 			this.idCounter = maxId + 1;
 			return this;
-		}
+		},
+
+		/////
+
+		// DELETION
+
+		deleteNode: function(nodeData){
+	        nodeData.node.remove();
+	        nodeData.path.remove();
+	        delete this.cache[nodeData.id];
+	        return this;
+	    }
 	});
 }(this, this.Pablo, this.MindMap, this.JSON));
