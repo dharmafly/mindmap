@@ -23,6 +23,17 @@
 			return this;
 		},
 
+        getAbsoluteCoords: function(nodeData){
+        	var x = nodeData.dx,
+        		y = nodeData.dy;
+
+            while (nodeData = this.cache[nodeData.parentId]){
+                x += nodeData.dx;
+                y += nodeData.dy;
+            }
+            return {x:x, y:y};
+        },
+
 		saveState: function(){
 			var toSave = {},
 				nodeId, nodeData;
@@ -43,7 +54,7 @@
 
 		restoreState: function(){
 			var localStorageCache = this.getLocalStorage('nodes'),
-				maxId, nodeId, nodeData;
+				maxId, nodeId, nodeData, coords;
 
 			if (localStorageCache){
 				this.svg.empty();
@@ -53,10 +64,11 @@
 					if (localStorageCache.hasOwnProperty(nodeId)){
 						nodeId = Number(nodeId);
 						nodeData = localStorageCache[nodeId];
+						coords = this.getAbsoluteCoords(nodeData);
 						this.drawNode(
 							nodeData.parentId,
-							nodeData.x,
-							nodeData.y,
+							coords.x,
+							coords.y,
 							nodeData.title,
 							nodeId
 						);
