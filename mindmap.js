@@ -163,21 +163,19 @@ var MindMap = (function(){
                 parentData = this.cache[nodeData.parentId],
                 pathData;
 
-            // Update stored data
-            nodeData.x = x;
-            nodeData.y = y; 
-
-            // x and y are initially page coordinates -> make them relative to the parent
-            if (parentData){
-                x -= parentData.x;
-                y -= parentData.y;
-
-                nodeData.relX = x;
-                nodeData.relY = y;
-            }
+            // Update the cached node data
+            // `x` and `y` are relative to the whole page
+            // `dx` and `dy` are relative to the parent node
+            Pablo.extend(nodeData, {
+                x:  x,
+                y:  y,
+                // TODO: parentData.x is where it was on creation; may have changed by dragging the grandparent
+                dx: x - (parentData ? parentData.x : 0),
+                dy: y - (parentData ? parentData.y : 0)
+            });
 
             // Translate the node to the new coordinates
-            node.transform('translate', x, y);
+            node.transform('translate', nodeData.dx, nodeData.dy);
 
             // Update the path drawn between the parent and node
             return this.updatePath(parentData, nodeData);
@@ -246,6 +244,7 @@ var MindMap = (function(){
             // The offset is the distance between the node's x,y origin and the mouse cursor
             this.dragging = {
                 nodeData: nodeData,
+                // TODO: nodeData.x is where it was on creation; may have changed by dragging parent
                 offsetX:  x - nodeData.x,
                 offsetY:  y - nodeData.y
             };
@@ -264,7 +263,17 @@ var MindMap = (function(){
             return this.updatePosition(d.nodeData, x, y);
         },
 
-        dragStop: function(){
+        dragStop: function(event){
+            var mindmap = this;
+
+            this.dragging.nodeData.node.children('.node').each(function(el){
+                var nodeId = mindmap.getId(Pablo(el)),
+                    nodeData = mindmap.cache[nodeId];
+
+                nodeData.x = event.pageX + nodeData.dx;
+                nodeData.y = event.pageY + nodeData.dy;
+            });
+
             this.dragging = null;
             return this;
         },
@@ -297,9 +306,9 @@ var MindMap = (function(){
                         mindmap.drag(event.pageX, event.pageY);
                     }
                 })
-                .on('mouseup', function(){
+                .on('mouseup', function(event){
                     if (mindmap.dragging){
-                        mindmap.dragStop();
+                        mindmap.dragStop(event);
                     }
                 })
 
@@ -318,7 +327,7 @@ var MindMap = (function(){
 
                         // Stop dragging when the mouse leaves the SVG element
                         if (!isSvg){
-                            mindmap.dragStop();
+                            mindmap.dragStop(event);
                         }
                     }
                 });
