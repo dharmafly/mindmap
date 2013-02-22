@@ -8,21 +8,20 @@ var MindMap = (function(){
 
         // Create SVG root
         this.svg = Pablo(htmlContainer).svg({
-                // Alternatively, specify `svg {width:100%; height:100%;}`
-                // in the CSS stylesheet
-                width: window.innerWidth,
-                height: window.innerHeight
-            })
-            // Set up event handlers - see mindmap.onmousedown(), etc
-            .on('mousedown mousemove mouseup mouseout', function(event){
-                mindmap['on' + event.type](event);
-            });
+            // Alternatively, specify `svg {width:100%; height:100%;}`
+            // in the CSS stylesheet
+            width: window.innerWidth,
+            height: window.innerHeight
+        });
 
         // Create a simple object cache in memory
         this.cache = {}; // data about each node
 
         // Add instructions message
         this.addInstructions();
+
+        // Setup event handlers for user interaction
+        this.setupEvents();
     }
 
     MindMap.prototype = {
@@ -236,58 +235,6 @@ var MindMap = (function(){
                 node : node.parents('.node').first();
         },
 
-        onmousedown: function(event){
-            var nodeId, node, x, y;
-
-            // left button click
-            if (event.which === 1){
-                node = this.nearestNode(event.target);
-                x = event.pageX;
-                y = event.pageY;
-
-                if (node.length){
-                    nodeId = node.attr('data-id');
-                    this.makeSelected(nodeId);
-                    this.dragStart(nodeId, x, y);
-                }
-                else {
-                    this.userCreate(x, y);
-                }
-            }
-        },
-
-        onmousemove: function(event){
-            if (this.dragging){
-                this.drag(event.pageX, event.pageY);
-            }
-        },
-
-        onmouseup: function(){
-            if (this.dragging){
-                this.dragStop();
-            }
-        },
-
-        // When the mouse leaves the SVG element, stop dragging
-        // E.g. this prevents the mouse dragging out of the window, the mouse
-        // button released _outside_ the window and returning, still dragging
-        onmouseout: function(event){
-            var to, isSvg;
-
-            if (this.dragging){
-                // Which element is the mouse entering?
-                to = event.relatedTarget;
-
-                // Is that element the SVG root or one of its children?
-                isSvg = to && (to === this.svg[0] || to.ownerSVGElement === this.svg[0]);
-
-                // Stop dragging when the mouse leaves the SVG element
-                if (!isSvg){
-                    this.dragStop();
-                }
-            }
-        },
-
         dragStart: function(nodeId, x, y){
             var nodeData = this.cache[nodeId];
 
@@ -316,6 +263,61 @@ var MindMap = (function(){
         dragStop: function(){
             this.dragging = null;
             return this;
+        },
+
+        setupEvents: function(){
+            var mindmap = this;
+            
+            this.svg
+                .on('mousedown', function(event){
+                    var nodeId, node, x, y;
+
+                    // left button click
+                    if (event.which === 1){
+                        node = mindmap.nearestNode(event.target);
+                        x = event.pageX;
+                        y = event.pageY;
+
+                        if (node.length){
+                            nodeId = node.attr('data-id');
+                            mindmap.makeSelected(nodeId);
+                            mindmap.dragStart(nodeId, x, y);
+                        }
+                        else {
+                            mindmap.userCreate(x, y);
+                        }
+                    }
+                })
+                .on('mousemove', function(event){
+                    if (mindmap.dragging){
+                        mindmap.drag(event.pageX, event.pageY);
+                    }
+                })
+                .on('mouseup', function(){
+                    if (mindmap.dragging){
+                        mindmap.dragStop();
+                    }
+                })
+
+                // When the mouse leaves the SVG element, stop dragging
+                // E.g. this prevents the mouse dragging out of the window, the mouse
+                // button released _outside_ the window and returning, still dragging
+                .on('mouseout', function(event){
+                    var to, isSvg;
+
+                    if (mindmap.dragging){
+                        // Which element is the mouse entering?
+                        to = event.relatedTarget;
+
+                        // Is that element the SVG root or one of its children?
+                        isSvg = to && (to === mindmap.svg[0] || to.ownerSVGElement === mindmap.svg[0]);
+
+                        // Stop dragging when the mouse leaves the SVG element
+                        if (!isSvg){
+                            mindmap.dragStop();
+                        }
+                    }
+                });
         }
     };
 
