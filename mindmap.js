@@ -1,6 +1,6 @@
 /*global Pablo*/
 /*jshint newcap:false*/
-var MindMap = (function(){
+(function(window){
     'use strict';
 
     function MindMap(htmlContainer){
@@ -23,6 +23,8 @@ var MindMap = (function(){
     }
 
     MindMap.prototype = {
+        // SETTINGS
+
         PADDING_X: 6,
         PADDING_Y: 4,
         CORNER_R: 7,
@@ -30,13 +32,16 @@ var MindMap = (function(){
         FONTSIZE: 20,
         nextId: 1,
 
+
+        // CREATE MINDMAP NODES
+
         getId: function(node){
             return node && Number(node.attr('data-id'));
         },
 
         // Ask the user what text to put in a new node
         createNode: function(x, y){
-            var title = window.prompt("What?") || '',
+            var title = window.prompt('What?') || '',
                 parent = this.selected || this.svg.find('.node').eq(0);
 
             title = title.trim();
@@ -170,7 +175,7 @@ var MindMap = (function(){
                 parentData = this.cache[nodeData.parentId];
 
                 // Calculate the curve between the parent and node
-                pathData = this.getPathData(parentData, nodeData)
+                pathData = this.getPathData(parentData, nodeData);
 
                 // Set the element's `d` (data) attribute with the path data
                 path.attr('d', pathData);
@@ -262,7 +267,8 @@ var MindMap = (function(){
 
             this.svg.text({x:10, y:90})
                     .addClass('instructions')
-                    .content('Click a node to select as the next parent.')
+                    .content('Click a node to select as the next parent.');
+
             return this;
         },
 
@@ -357,5 +363,5 @@ var MindMap = (function(){
     /////
 
 
-    return MindMap;
-}());
+    window.MindMap = MindMap;
+}(this));
