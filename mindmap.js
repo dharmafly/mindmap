@@ -4,8 +4,6 @@ var MindMap = (function(){
     'use strict';
 
     function MindMap(htmlContainer){
-        var mindmap = this;
-
         // Create SVG root
         this.svg = Pablo(htmlContainer).svg({
             // Alternatively, specify `svg {width:100%; height:100%;}`
@@ -25,28 +23,47 @@ var MindMap = (function(){
     }
 
     MindMap.prototype = {
-        PADDING_X: 8,
-        PADDING_Y: 5,
+        PADDING_X: 6,
+        PADDING_Y: 4,
         CORNER_R: 7,
         PATH_CURVE: 30,
         FONTSIZE: 20,
-        idCounter: 1,
+        nextId: 1,
 
         getId: function(node){
-            return node && node.attr('data-id');
+            return node && Number(node.attr('data-id'));
         },
 
         // Ask the user what text to put in a new node
         userCreate: function(x, y){
             var title = window.prompt("What's the text?") || '',
-                parent = this.selected || this.svg.find('.node').eq(0),
-                parentId = this.getId(parent);
+                parent = this.selected || this.svg.find('.node').eq(0);
 
             title = title.trim();
             if (title){
-                this.drawNode(parentId, x, y, title);
+                this.drawNodeAbsolute({
+                    parentId: this.getId(parent),
+                    title: title
+                }, x, y);
             }
             return this;
+        },
+
+        // `nodeData` must contain: `parentId`, `dx`, `dy`
+        // it may also contain: `id`, `title`
+        drawNode: function(nodeData){
+            // If no id, generate one for a new node
+            if (!nodeData.id){
+                nodeData.id = this.nextId ++;
+            }
+
+            // Store data about the node in a lookup object
+            this.cache[nodeData.id] = nodeData;
+
+            // Update the node's text and position, and mark it `selected`
+            return this.createElements(nodeData)
+                       .updateText(nodeData, nodeData.title)
+                       .updatePosition(nodeData, nodeData.dx, nodeData.dy);
         },
 
         getRelativeCoords: function(nodeData, x, y){
@@ -57,35 +74,17 @@ var MindMap = (function(){
             return {x:x, y:y};
         },
 
-        drawNode: function(parentId, x, y, title, nodeId){
-            var nodeId, nodeData, delta;
-
-            // Generate a new id for the node
-            if (!nodeId){
-                nodeId = this.idCounter ++;
-            }
-
-            // Remove the instructions text, since this is the first node
-            // TODO: this shouldn't be here!
-            if (!parentId) {
-                this.removeInstructions();
-            }
-
-            // Store data about the node in a lookup object
-            nodeData = this.cache[nodeId] = {
-                id: nodeId,
-                parentId: parentId,
-                title: title
-            };
-
+        drawNodeAbsolute: function(nodeData, x, y){
             // Calculate x, y coordinates relative to the parent node
-            delta = this.getRelativeCoords(nodeData, x, y);
+            var delta = this.getRelativeCoords(nodeData, x, y);
+            nodeData.dx = delta.x;
+            nodeData.dy = delta.y;
 
-            // Update the node's text and position, and mark it `selected`
-            return this.createElements(nodeData)
-                       .updateText(nodeData, title)
-                       .updatePosition(nodeData, delta.x, delta.y);
+            return this.drawNode(nodeData);
         },
+
+
+        // CREATE AND UPDATE DOM ELEMENTS
 
         createElements: function(nodeData){
             var parentId = nodeData.parentId,
@@ -178,6 +177,9 @@ var MindMap = (function(){
             return this;
         },
 
+
+        // CALCULATE PATH
+
         // Draw a path from the parent to the child
         // `p` = parentData, `n` = nodeData
         getPathData: function(p, n){
@@ -195,23 +197,8 @@ var MindMap = (function(){
                    'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
         },
 
-        makeSelected: function(nodeId){
-            var node = this.cache[nodeId].node;
 
-            // De-selected currently selected node
-            if (this.selected){
-                this.selected.removeClass('selected');
-            }
-
-            // Store node as `mindmap.selected` property
-            this.selected = node
-                // Add a CSS class
-                .addClass('selected')
-                // Bring to front, to prevent the node being dragged behind another node
-                .appendTo(node.parent());
-
-            return this;
-        },
+        // INSTRUCTIONS TEXT
 
         // Add a <text> element with instructions
         addInstructions: function(){
@@ -231,11 +218,29 @@ var MindMap = (function(){
             return this;
         },
 
-        nearestNode: function(el){
-            var node = Pablo(el);
-            return node.hasClass('node') ?
-                node : node.parents('.node').first();
+
+        // SELECTING A NODE
+
+        makeSelected: function(nodeId){
+            var nodeData = this.cache[nodeId];
+
+            // De-selected currently selected node
+            if (this.selected){
+                this.selected.removeClass('selected');
+            }
+
+            // Store node as `mindmap.selected` property
+            this.selected = nodeData.node
+                // Add a CSS class
+                .addClass('selected')
+                // Bring to front, to prevent the node being dragged behind another node
+                .appendTo(nodeData.node.parent());
+
+            return this;
         },
+
+
+        // DRAGGING
 
         dragStart: function(nodeId, x, y){
             var nodeData = this.cache[nodeId];
@@ -266,15 +271,40 @@ var MindMap = (function(){
             return this;
         },
 
+
+        // EVENT HANDLERS
+
+        // If the target element is the outer container for a 
+        // mindmap node, then return it. Otherwise, walk up through
+        // the element's DOM and return the nextIdt container
+        nearestNode: function(el){
+            var node = Pablo(el);
+            return node.hasClass('node') ?
+                node : node.parents('.node').first();
+        },
+
         setupEvents: function(){
             var mindmap = this;
 
+            // Delegate multiple event handlers to the <svg> element
+            // This performs better than setting click handlers on every
+            // node element in the map.
             this.svg
+                // On (only) the first mouse click, remove the
+                // instructions text.
+                .one('click', function(){
+                    mindmap.removeInstructions();
+                })
+
+                // On every mouse down, if clicking on existing node,
+                // then select it. Otherwise, create a new one.
                 .on('mousedown', function(event){
                     var nodeId, node, x, y;
 
-                    // left button click
+                    // Left mouse button was pressed
                     if (event.which === 1){
+                        // Determine if the click target was a node
+                        // element or one of its children.
                         node = mindmap.nearestNode(event.target);
                         x = event.pageX;
                         y = event.pageY;
