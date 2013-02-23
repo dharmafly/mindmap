@@ -23,62 +23,47 @@
 			return this;
 		},
 
-        getAbsoluteCoords: function(nodeData){
-        	var x = nodeData.dx,
-        		y = nodeData.dy;
 
-            while (nodeData = this.cache[nodeData.parentId]){
-                x += nodeData.dx;
-                y += nodeData.dy;
-            }
-            return {x:x, y:y};
-        },
-
+		// The minimum node data in memory necessary to recreate
+		// the map is saved in localStorage and can be later restored
 		saveState: function(){
-			var toSave = {},
-				nodeId, nodeData;
+			var cache = this.cache,
+				// Ensure we pre-sort the node ids on save, to
+				// maximise load performance
+				nodeIds = Object.keys(cache).sort(function(a, b){
+					return a - b;
+				}),
+				nodes;
 
-			for (nodeId in this.cache){
-				if (this.cache.hasOwnProperty(nodeId)){
-					nodeData = this.cache[nodeId];
-					toSave[nodeId] = {
-						parentId: nodeData.parentId,
-						dx: nodeData.dx,
-						dy: nodeData.dy,
-						title: nodeData.title
-					};
-				}
-			}
-			return this.setLocalStorage('nodes', toSave);
+			nodes = nodeIds.map(function(nodeId){
+				var nodeData = cache[nodeId];
+
+				return {
+					parentId: nodeData.parentId,
+					title: nodeData.title,
+					dx: nodeData.dx,
+					dy: nodeData.dy
+				};
+			});
+
+			return this.setLocalStorage('nodes', nodes);
 		},
 
 		restoreState: function(){
-			var localStorageCache = this.getLocalStorage('nodes'),
-				maxId, nodeId, nodeData, coords;
+			var nodes = this.getLocalStorage('nodes'),
+				lastNode;
 
-			if (localStorageCache){
+			if (nodes){
 				this.svg.empty();
-				maxId = 0;
 
-				for (nodeId in localStorageCache){
-					if (localStorageCache.hasOwnProperty(nodeId)){
-						nodeId = Number(nodeId);
-						nodeData = localStorageCache[nodeId];
-						coords = this.getAbsoluteCoords(nodeData);
-						this.drawNode(
-							nodeData.parentId,
-							coords.x,
-							coords.y,
-							nodeData.title,
-							nodeId
-						);
-						if (nodeId > maxId){
-							maxId = nodeId;
-						}
-					}
-				}
-				// Start counter after last id
-				this.idCounter = maxId + 1;
+				// Draw every node in the stored cache
+				nodes.forEach(function(nodeData){
+					this.drawNode(nodeData);
+				}, this);
+
+				// Set the next id counter to the latest node
+				lastNode = nodes.slice(-1)[0];
+				this.nextId = lastNode.id + 1;
 			}
 			return this;
 		},
@@ -88,9 +73,31 @@
 		// DELETION
 
 		deleteNode: function(nodeData){
+			var nodeId = nodeData.id,
+				parent;
+
+			// Remove DOM elements
 	        nodeData.node.remove();
 	        nodeData.path.remove();
-	        delete this.cache[nodeData.id];
+
+		    // Delete data stored in memory
+	        delete this.cache[nodeId];
+
+	        // Delete child nodes
+	        Object.keys(this.cache)
+		        .filter(function(testId){
+		        	return nodeId === this.cache[testId].parentId;
+		        }, this)
+		        .forEach(function(nodeId){
+		        	this.deleteNode(this.cache[nodeId]);
+		        }, this);
+
+			// If this node is `selected` then select the parent node
+			if (this.getId(this.selected) === nodeId){
+				parent = this.svg.find('[data-id="' + nodeId + '"]');
+				this.selected = null;
+			}
+
 	        return this;
 	    }
 	});
