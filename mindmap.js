@@ -261,13 +261,17 @@
 
         // Add a <text> element with instructions
         addInstructions: function(){
-            this.svg.text({x:10, y:50})
-                    .addClass('instructions')
-                    .content('Click anywhere to create nodes.');
-
-            this.svg.text({x:10, y:90})
-                    .addClass('instructions')
-                    .content('Click a node to select as the next parent.');
+            var text = this.svg.text({x:10})
+                .addClass('instructions')
+                // Create two more, cloned text nodes
+                .duplicate(2)
+                // Use an array to set a different `y` attribute to each element
+                .attr('y', [50, 100, 150])
+                .content([
+                    'Keep clicking in space to create a bunch of concepts.',
+                    'Click a concept to select it as the next parent.',
+                    'Reorder the map by dragging the concepts.'
+                ]);
 
             return this;
         },
