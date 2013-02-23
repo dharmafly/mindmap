@@ -35,8 +35,8 @@ var MindMap = (function(){
         },
 
         // Ask the user what text to put in a new node
-        userCreate: function(x, y){
-            var title = window.prompt("What's the text?") || '',
+        createNode: function(x, y){
+            var title = window.prompt("What?") || '',
                 parent = this.selected || this.svg.find('.node').eq(0);
 
             title = title.trim();
@@ -109,9 +109,10 @@ var MindMap = (function(){
                 'font-size': this.FONTSIZE
             });
 
-            // Create a <path> element to visually connect the parent and node.
-            // Its coordinates are set by the `updatePosition` method.
-            // We prepend it so that it appears beneath the parent's rectangle.
+            // Create a <path> element to visually connect the 
+            // parent and node. Its coordinates are set by the 
+            // `updatePosition` method. We prepend it so that 
+            // it appears beneath the parent's rectangle.
             path = parentId ?
                 Pablo.path().prependTo(parent) : null;
 
@@ -143,13 +144,11 @@ var MindMap = (function(){
                 height: nodeData.height
             });
 
-            return this;
+            return this.updatePath(nodeData);
         },
 
         updatePosition: function(nodeData, dx, dy){
-            var node = nodeData.node,
-                parentData = this.cache[nodeData.parentId],
-                pathData;
+            var node = nodeData.node;
 
             // Update the cached node data
             nodeData.dx = dx;
@@ -159,15 +158,17 @@ var MindMap = (function(){
             node.transform('translate', dx, dy);
 
             // Update the path drawn between the parent and node
-            return this.updatePath(parentData, nodeData);
+            return this.updatePath(nodeData);
         },
 
-        updatePath: function(parentData, nodeData){
+        updatePath: function(nodeData){
             // Get the <path> element
             var path = nodeData.path,
-                pathData;
+                parentData, pathData;
 
             if (path){
+                parentData = this.cache[nodeData.parentId];
+
                 // Calculate the curve between the parent and node
                 pathData = this.getPathData(parentData, nodeData)
 
@@ -178,7 +179,7 @@ var MindMap = (function(){
         },
 
 
-        // CALCULATE PATH
+        // CALCULATE PATH'S CURVE
 
         // Draw a path from the parent to the child
         // `p` = parentData, `n` = nodeData
@@ -198,28 +199,7 @@ var MindMap = (function(){
         },
 
 
-        // INSTRUCTIONS TEXT
-
-        // Add a <text> element with instructions
-        addInstructions: function(){
-            this.svg.text({x:10, y:50})
-                    .addClass('instructions')
-                    .content('Click anywhere to create nodes.');
-
-            this.svg.text({x:10, y:90})
-                    .addClass('instructions')
-                    .content('Click a node to select as the next parent.')
-            return this;
-        },
-
-        // Remove the instructions <text> element
-        removeInstructions: function(){
-            this.svg.find('.instructions').remove();
-            return this;
-        },
-
-
-        // SELECTING A NODE
+        // SELECT NODE
 
         makeSelected: function(nodeId){
             var nodeData = this.cache[nodeId];
@@ -240,7 +220,7 @@ var MindMap = (function(){
         },
 
 
-        // DRAGGING
+        // DRAG NODE
 
         dragStart: function(nodeId, x, y){
             var nodeData = this.cache[nodeId];
@@ -272,6 +252,27 @@ var MindMap = (function(){
         },
 
 
+        // ADD/REMOVE INSTRUCTIONS TEXT
+
+        // Add a <text> element with instructions
+        addInstructions: function(){
+            this.svg.text({x:10, y:50})
+                    .addClass('instructions')
+                    .content('Click anywhere to create nodes.');
+
+            this.svg.text({x:10, y:90})
+                    .addClass('instructions')
+                    .content('Click a node to select as the next parent.')
+            return this;
+        },
+
+        // Remove the instructions <text> element
+        removeInstructions: function(){
+            this.svg.find('.instructions').remove();
+            return this;
+        },
+
+
         // EVENT HANDLERS
 
         // If the target element is the outer container for a 
@@ -290,9 +291,9 @@ var MindMap = (function(){
             // This performs better than setting click handlers on every
             // node element in the map.
             this.svg
-                // On (only) the first mouse click, remove the
+                // On (only) the first mouse down, remove the
                 // instructions text.
-                .one('click', function(){
+                .one('mousedown', function(){
                     mindmap.removeInstructions();
                 })
 
@@ -315,7 +316,7 @@ var MindMap = (function(){
                             mindmap.dragStart(nodeId, x, y);
                         }
                         else {
-                            mindmap.userCreate(x, y);
+                            mindmap.createNode(x, y);
                         }
                     }
                 })
