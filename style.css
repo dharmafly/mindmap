@@ -1,16 +1,24 @@
 /* Containers */
-body {
-	margin: 0;
-	padding: 0;
-}
 svg {
 	font-family: sans-serif;
 }
+/* Fill the screen with the SVG. To alternatively use JavaScript:
+
+	   Pablo(element).svg({width:'100%', height:'100%'});
+*/
+html, body, #mindmap, svg {
+	width:100%;
+	height:100%;
+	margin: 0;
+	padding: 0;
+}
+
 
 /* Text about the app */
 .instructions {
 	font-size: 30px;
 }
+
 
 /* Node */
 .node {
@@ -43,9 +51,10 @@ svg {
 	stroke-linecap: round;
 }
 
+
 /* Selected node:
-   style the <rect> that is a direct child of the node (i.e. not <rect>'s
-   belonging to child nodes)
+   Style the <rect> element that is a direct child of the node container
+   element - i.e. not <rect> elements belonging to child nodes
 */
 .node.selected > rect {
 	fill: #fff;
@@ -53,7 +62,8 @@ svg {
 	stroke-width: 1;
 }
 
-/* Different styles for the first node */
+
+/* Different styles for the first node of the mindmap */
 svg > .node > rect, 
 svg > .node.selected > rect {
 	fill: #333;

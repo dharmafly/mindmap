@@ -3,25 +3,13 @@
 (function(window){
     'use strict';
 
+    // Create a JavaScript `MindMap` constructor that can
+    // be called with `new MindMap('#my-container');`
     function MindMap(htmlContainer){
-        // Create SVG root
-        this.svg = Pablo(htmlContainer).svg({
-            // Alternatively, specify `svg {width:100%; height:100%;}`
-            // in the CSS stylesheet
-            width: window.innerWidth,
-            height: window.innerHeight
-        });
-
-        // Create a simple object cache in memory
-        this.cache = {}; // data about each node
-
-        // Add instructions message
-        this.addInstructions();
-
-        // Setup event handlers for user interaction
-        this.setupEvents();
+        this.init(htmlContainer);
     }
 
+    // Create properties and methods for `MindMap` objects
     MindMap.prototype = {
         // SETTINGS
 
@@ -31,6 +19,38 @@
         PATH_CURVE: 30,
         FONTSIZE: 20,
         nextId: 1,
+
+
+        // INITIALISE MINDMAP
+
+        init: function(htmlContainer){
+            /* Wrap the HTML container element(s) as a Pablo 'collection', and
+            empty it (i.e. remove any child nodes).
+
+            The argument `htmlContainer` could be a DOM element, a CSS selector 
+            targetting one or more elements, a Pablo collection, or an array of
+            elements. Both SVG and HTML elements can be wrapped, although Pablo 
+            focusses on SVG. */
+            var container = Pablo(htmlContainer).empty();
+
+            /* Empty the HTML container element; append an <svg> root element.
+            Often `width` and `height` attributes are given:
+                   `collection.svg({width:400, height:'60%'})`
+            */
+            this.svg = container.svg();
+
+            // Create a simple object cache in memory
+            this.cache = {};
+
+            /* Add instructions and setup event handlers for user interaction.
+            Most methods return `this`, (which is the `MindMap` object), to 
+            allow method chaining, as with jQuery (although jQuery is not a 
+            dependency of Pablo), e.g.
+                `Pablo('#foo.bar').siblings().attr({x:1})`
+            */
+            return this.setupEvents()
+                       .addInstructions();
+        },
 
 
         // CREATE MINDMAP NODES
@@ -301,8 +321,7 @@
             // This performs better than setting click handlers on every
             // node element in the map.
             this.svg
-                // On (only) the first mouse down, remove the
-                // instructions text.
+                // On (only) the first mouse down, remove instructions.
                 .one('mousedown', function(){
                     mindmap.removeInstructions();
                 })
@@ -360,6 +379,7 @@
                         }
                     }
                 });
+            return this;
         }
     };
 
