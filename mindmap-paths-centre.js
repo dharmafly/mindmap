@@ -195,7 +195,7 @@
                 parentData = this.cache[nodeData.parentId];
 
                 // Calculate the curve between the parent and node
-                pathData = this.getPathData(nodeData, parentData);
+                pathData = this.getPathData(parentData, nodeData);
 
                 // Set the element's `d` (data) attribute with the path data
                 path.attr('d', pathData);
@@ -209,31 +209,36 @@
 
         // Draw a path from the parent to the child
         // `p` = parentData, `n` = nodeData
-        getPathData: function(n, p){
-            var // Is the node to the left or above the parent?
-                isLeft  = n.dx + (n.width  / 2) < 0,
-                isAbove = n.dy + (n.height / 2) < 0,
-
-                // The curve connects the two points x1,y1 to x2,y2.
-                // x1,y1 is at the parent node's side edge and halfway up.
-                // Note that, in this example, x2,y2 is *relative* to x1,y2.
-                x1 = isLeft ? 0 : p.width,
+        getPathData: function(p, n){
+            var isLeft  = n.dx > 0,
+                isAbove = n.dy > 0,
+                x1 = p.width / 2,
+                x2 = n.dx + n.width / 2 - x1,
                 y1 = p.height / 2,
-
-                // The curve stops at the node's side and halfway up.
-                x2 = n.dx + (isLeft ? n.width : -x1),
                 y2 = n.dy,
-
-                // The curve has a 'control point', to determine the amount and 
-                // direction it deviates away from being a straight line. The 
-                // control point is positioned a little distance away from a 
-                // point halfway     the path.
                 curve = this.PATH_CURVE,
-                controlX = x2 / 2 + (isLeft ? curve : -curve),
-                controlY = y2 / 2 + (isAbove ? -curve : curve);
+                xCtrl = x2 / 2 + (isLeft ? curve : -curve),
+                yCtrl = y2 / 2 + (isAbove ? -curve : curve);
 
             return 'm' + x1 + ' ' + y1 +
-                   'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
+                   'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
+        },
+
+        // Draw a path from the parent to the child
+        // `p` = parentData, `n` = nodeData
+        xgetPathData: function(p, n){
+            var isLeft  = n.dx > 0,
+                isAbove = n.dy > 0,
+                x1 = isLeft ? p.width : 0,
+                x2 = n.dx + (isLeft ? -x1 : n.width),
+                y1 = p.height / 2,
+                y2 = n.dy,
+                curve = this.PATH_CURVE,
+                xCtrl = x2 / 2 + (isLeft ? curve : -curve),
+                yCtrl = y2 / 2 + (isAbove ? -curve : curve);
+
+            return 'm' + x1 + ' ' + y1 +
+                   'q' + xCtrl + ' ' + yCtrl + ',' + x2  + ' ' + y2;
         },
 
 
