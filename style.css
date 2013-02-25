@@ -21,7 +21,7 @@ html, body, #mindmap, svg {
 
 
 /* Node */
-.node {
+.node rect, .node text {
 	cursor: pointer;
 }
 

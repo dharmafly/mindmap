@@ -138,7 +138,8 @@
             // parent and node. Its coordinates are set by the 
             // `updatePosition` method. We prepend it so that 
             // it appears beneath the parent's rectangle.
-            path = Pablo.path().prependTo(parent);
+            path = parentId ?
+                Pablo.path().prependTo(parent) : null;
 
             // Extend the cached lookup object to give quick access to the elements
             Pablo.extend(nodeData, {node:node, rect:rect, text:text, path:path});
@@ -188,10 +189,11 @@
         updatePath: function(nodeData){
             // Get the <path> element
             var path = nodeData.path,
-                parentData = this.cache[nodeData.parentId],
-                pathData;
+                parentData, pathData;
 
-            if (parentData){
+            if (path){
+                parentData = this.cache[nodeData.parentId];
+
                 // Calculate the curve between the parent and node
                 pathData = this.getPathData(nodeData, parentData);
 
@@ -215,12 +217,12 @@
                 // The curve connects the two points x1,y1 to x2,y2.
                 // x1,y1 is at the parent node's side edge and halfway up.
                 // Note that, in this example, x2,y2 is *relative* to x1,y2.
-                x1 = isLeft ? 0 : p.width,
-                y1 = p.height / 2,
+                x1 = p.width / 2,
+                y1 = isAbove ? 0 : p.height,
 
                 // The curve stops at the node's side and halfway up.
-                x2 = n.dx + (isLeft ? n.width : -x1),
-                y2 = n.dy,
+                x2 = n.dx - x1 + n.width / 2,
+                y2 = n.dy - y1 + (isAbove ? n.height : 0),
 
                 // The curve has a 'control point', to determine the amount and 
                 // direction it deviates away from being a straight line. The 
@@ -234,7 +236,6 @@
                    'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
         },
 
-        /*
         xgetPathData: function(n, p){
             var // Is the node to the left or above the parent?
                 isLeft  = n.dx + (n.width  / 2) < 0,
@@ -243,25 +244,24 @@
                 // The curve connects the two points x1,y1 to x2,y2.
                 // x1,y1 is at the parent node's side edge and halfway up.
                 // Note that, in this example, x2,y2 is *relative* to x1,y2.
-                x1 = p.width / 2,
-                y1 = isAbove ? 0 : p.height,
+                x1 = isLeft ? 0 : p.width,
+                y1 = p.height / 2,
 
                 // The curve stops at the node's side and halfway up.
-                x2 = n.dx - x1 + n.width / 2,
-                y2 = n.dy - y1 + (isAbove ? n.height : 0),
+                x2 = n.dx + (isLeft ? n.width : -x1),
+                y2 = n.dy,
 
                 // The curve has a 'control point', to determine the amount and 
                 // direction it deviates away from being a straight line. The 
                 // control point is positioned a little distance away from a 
-                // point halfway the path.
+                // point halfway     the path.
                 curve = this.PATH_CURVE,
-                controlX = x2 / 2 + (isLeft ? -curve : curve),
-                controlY = y2 / 2 + (isAbove ? curve : -curve);
+                controlX = x2 / 2 + (isLeft ? curve : -curve),
+                controlY = y2 / 2 + (isAbove ? -curve : curve);
 
             return 'm' + x1 + ' ' + y1 +
                    'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
         },
-        */
 
 
         // SELECT NODE
@@ -321,7 +321,7 @@
 
         // Add a <text> element with instructions
         addInstructions: function(){
-            this.svg.text({x:10})
+            var text = this.svg.text({x:10})
                 .addClass('instructions')
                 // Create two more, cloned text nodes
                 .duplicate(2)
