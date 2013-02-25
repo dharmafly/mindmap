@@ -574,11 +574,9 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             return this;
         },
         
-        /*
         child: function(node, attr){
             return toPablo(node, attr).appendTo(this);
         },
-        */
         
         before: function(node, attr){
             return this.each(function(el){
@@ -707,14 +705,14 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             return this;
         },
 
-        /*
-        pluck: function(prop){
+        // Return an array of values from an attribute for each element 
+        // in the collection
+        pluck: function(attr){
             return toArray(this).map(function(el){
-                return Pablo(el).attr(prop) || el[prop];
+                return Pablo(el).attr(attr);
 
             });
         },
-        */
 
         transform: function(functionName, value/* , additional values*/){
             // Additional arguments are space-delimited as part of the value
