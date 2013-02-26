@@ -77,16 +77,20 @@
         // `nodeData` must contain: `parentId`, `dx`, `dy`
         // it may also contain: `id`, `title`
         drawNode: function(nodeData){
-            // If no id, generate one for a new node
+            // If there's no parent (e.g. for the first node), append to the SVG root
+            var parent = nodeData.parentId ?
+                    this.cache[nodeData.parentId].node : this.svg;
+
+            // If there's no specified id, generate a new id
             if (!nodeData.id){
                 nodeData.id = this.nextId ++;
             }
 
             // Store data about the node in a lookup object
             this.cache[nodeData.id] = nodeData;
-
+            
             // Update the node's text and position, and mark it `selected`
-            return this.createElements(nodeData)
+            return this.createElements(nodeData, parent)
                        .updateText(nodeData, nodeData.title)
                        .updatePosition(nodeData, nodeData.dx, nodeData.dy);
         },
@@ -111,14 +115,10 @@
 
         // CREATE AND UPDATE DOM ELEMENTS
 
-        createElements: function(nodeData){
+        createElements: function(nodeData, parent){
             var parentId = nodeData.parentId,
                 parentData = this.cache[parentId],
-                parent, path, node, rect, text;
-
-            // If there's no parent (e.g. for the first node), append to the SVG root
-            parent = parentData ?
-                parentData.node : this.svg;
+                node, rect, text, path;
 
             // Append a <g> group element to the parent to represent the 
             // mindmap node in the DOM
