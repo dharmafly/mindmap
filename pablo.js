@@ -668,14 +668,20 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 if (typeof value === 'undefined'){
                     el = this[0];
 
+                    if (!el){
+                        return;
+                    }
+
                     // Namespaced attributes
                     colonIndex = attr.indexOf(':');
+
                     if (colonIndex >= 0){
                         nsPrefix = attr.slice(0, colonIndex);
                         nsURI = Pablo.ns[nsPrefix];
                         attr = attr.slice(colonIndex+1);
+                        return el.getAttributeNS(nsURI || null, attr);
                     }
-                    return el && el.getAttributeNS(nsURI || null, attr);
+                    return el.getAttribute(attr);
                 }
 
                 // Create attributes object

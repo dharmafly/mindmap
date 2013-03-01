@@ -59,12 +59,17 @@
             return node && Number(node.attr('data-id'));
         },
 
+        askTitle: function(){
+            var title = window.prompt('What?');
+            return title && title.trim();
+        },
+
         // Ask the user what text to put in a new node
         createNode: function(x, y){
-            var title = window.prompt('What?') || '',
-                parent = this.selected || this.svg.find('.node').eq(0);
+            var title = this.askTitle(),
+                parent = this.selected && this.selected.node ||
+                    this.svg.find('.node').eq(0);
 
-            title = title.trim();
             if (title){
                 this.drawNodeAbsolute({
                     parentId: this.getId(parent),
@@ -116,9 +121,7 @@
         // CREATE AND UPDATE DOM ELEMENTS
 
         createElements: function(nodeData, parent){
-            var parentId = nodeData.parentId,
-                parentData = this.cache[parentId],
-                node, rect, text, path;
+            var node, rect, text, path;
 
             // Append a <g> group element to the parent to represent the 
             // mindmap node in the DOM
@@ -157,10 +160,14 @@
             // Get the text's rendered dimensions. `getBBox()` is a native SVG DOM method
             bbox = text[0].getBBox();
             
-            // Add padding for the rectangle's dimensions and update the node data
-            // TODO: explain why 2*x but only 1*y; it's due to text baseline position and text x position having padding already applied
-            nodeData.width  = bbox.width + this.PADDING_X * 2;
-            nodeData.height = bbox.height + this.PADDING_Y;
+            // Add properties to nodeData
+            Pablo.extend(nodeData, {
+                title:  title,
+                // Add padding for the rectangle's dimensions and update the node data
+                // TODO: explain why 2*x but only 1*y; it's due to text baseline position and text x position having padding already applied
+                width:  bbox.width + this.PADDING_X * 2,
+                height: bbox.height + this.PADDING_Y
+            });
 
             // Update the cached data and apply to the <rect> element
             rect.attr({
@@ -271,14 +278,14 @@
 
             // De-selected currently selected node
             if (this.selected){
-                this.selected.removeClass('selected');
+                this.selected.node.removeClass('selected');
             }
 
             // Store node as `mindmap.selected` property
-            this.selected = nodeData.node
-                // Add a CSS class
-                .addClass('selected')
-                // Bring to front, to prevent the node being dragged behind another node
+            this.selected = nodeData;
+
+            nodeData.node.addClass('selected')
+                // Bring to front, so that it appears on top of other nodes
                 .appendTo(nodeData.node.parent());
 
             return this;
@@ -384,7 +391,7 @@
                             mindmap.makeSelected(nodeId);
                             mindmap.dragStart(nodeId, x, y);
                         }
-                        else {
+                        else if (event.target === mindmap.svg[0]) {
                             mindmap.createNode(x, y);
                         }
                     }

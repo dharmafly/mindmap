@@ -4,6 +4,75 @@
     var localStorage = window.localStorage;
 
     Pablo.extend(MindMap.prototype, {
+        resetUi: function(){
+            this.svg.find('.instructions,.node,path').remove();
+            return this;
+        },
+
+        // Icons by Adam Whitcroft: http://adamwhitcroft.com/batch/
+        addIcons: function(){
+            var mindmap = this,
+                actions = this.svg.g()
+                    .addClass('actions')
+                    .transform('translate', 5, 10);
+
+            actions.image({
+                    width: 24,
+                    height: 24
+                })
+                .addClass('icon')
+                .css('cursor', 'pointer')
+                .duplicate(3)
+                .attr({
+                    'data-action': ['delete', 'edit', 'save', 'restore'],
+                    'xlink:href': [
+                        'images/bin-3.svg',
+                        'images/pencil.svg',
+                        'images/arrow-down.svg',
+                        'images/arrow-up.svg'
+                    ]
+                })
+                .transform('translate', function(el, i){
+                    return '0 ' + (i * 28);
+                })
+                .title().content([
+                    'Delete node',
+                    'Edit node',
+                    'Save map',
+                    'Restore map'
+                ]);
+
+            actions.on('click', function(event){
+                var target = Pablo(event.target);
+
+                if (target.hasClass('icon')){
+                    switch (target.attr('data-action')){
+                        case 'delete':
+                        if (mindmap.selected){
+                            mindmap.deleteNode(mindmap.selected);
+                        }
+                        break;
+
+                        case 'edit':
+                        if (mindmap.selected){
+                            mindmap.editNode(mindmap.selected);
+                        }
+                        break;
+
+                        case 'save':
+                        mindmap.saveState();
+                        break;
+
+                        case 'restore':
+                        mindmap.restoreState();
+                        break;
+                    }
+                }
+            });
+
+            return this;
+        },
+
         // LOCAL STORAGE
 
         LOCALSTORAGE_PREFIX: 'mindful-',
@@ -31,39 +100,53 @@
                 // Ensure we pre-sort the node ids on save, to
                 // maximise load performance
                 nodeIds = Object.keys(cache).sort(function(a, b){
-                    return a - b;
+                    return Number(a) - Number(b);
                 }),
-                nodes;
+                nodesData;
 
-            nodes = nodeIds.map(function(nodeId){
+            nodesData = nodeIds.map(function(nodeId){
                 var nodeData = cache[nodeId];
 
                 return {
+                    id:       nodeData.id,
                     parentId: nodeData.parentId,
-                    title: nodeData.title,
-                    dx: nodeData.dx,
-                    dy: nodeData.dy
+                    title:    nodeData.title,
+                    dx:       nodeData.dx,
+                    dy:       nodeData.dy
                 };
             });
 
-            return this.setLocalStorage('nodes', nodes);
+            return this.setLocalStorage('nodes', nodesData);
         },
 
         restoreState: function(){
-            var nodes = this.getLocalStorage('nodes'),
+            var nodesData = this.getLocalStorage('nodes'),
                 lastNode;
 
-            if (nodes){
-                this.svg.empty();
+            if (nodesData){
+                this.resetUi();
 
                 // Draw every node in the stored cache
-                nodes.forEach(function(nodeData){
+                nodesData.forEach(function(nodeData){
                     this.drawNode(nodeData);
                 }, this);
 
                 // Set the next id counter to the latest node
-                lastNode = nodes.slice(-1)[0];
+                lastNode = nodesData[nodesData.length-1];
                 this.nextId = lastNode.id + 1;
+            }
+            return this;
+        },
+
+        /////
+
+        // EDITING
+
+        editNode: function(nodeData){
+            var title = this.askTitle();
+
+            if (title){
+                this.updateText(nodeData, title);
             }
             return this;
         },
@@ -73,8 +156,7 @@
         // DELETION
 
         deleteNode: function(nodeData){
-            var nodeId = nodeData.id,
-                parent;
+            var nodeId = nodeData.id;
 
             // Remove DOM elements
             nodeData.node.remove();
@@ -93,9 +175,8 @@
                 }, this);
 
             // If this node is `selected` then select the parent node
-            if (this.getId(this.selected) === nodeId){
-                parent = this.svg.find('[data-id="' + nodeId + '"]');
-                this.selected = null;
+            if (this.selected && this.selected.id === nodeId && this.selected.parentId){
+                this.makeSelected(this.selected.parentId);
             }
 
             return this;
