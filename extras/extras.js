@@ -175,8 +175,13 @@
                 }, this);
 
             // If this node is `selected` then select the parent node
-            if (this.selected && this.selected.id === nodeId && this.selected.parentId){
-                this.makeSelected(this.selected.parentId);
+            if (this.selected && this.selected.id === nodeId){
+                if (this.selected.parentId){
+                    this.makeSelected(this.selected.parentId);
+                }
+                else {
+                    this.selected = null;
+                }
             }
 
             return this;
