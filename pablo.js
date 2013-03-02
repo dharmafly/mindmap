@@ -13,7 +13,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     'use strict';
     
     var /* SETTINGS */
-        pabloVersion = '0.2.4',
+        pabloVersion = '0.2.5',
         svgVersion = 1.1,
         svgns = 'http://www.w3.org/2000/svg',
         xlinkns = 'http://www.w3.org/1999/xlink',
@@ -119,7 +119,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         return obj && obj.namespaceURI && obj.namespaceURI === svgns;
     }
     
-    function isSvg(obj){
+    function isSVGElement(obj){
         return obj instanceof SVGElement;
     }
     
@@ -331,21 +331,12 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         return behaviour === 'filter' ? filtered :
               (behaviour === 'every'  ? true : false);
     }
-
-    function traverse(prop){
-        return function(selectors){
-            var collection = this.map(function(el){
-                return el[prop];
-            });
-            return selectors ? collection.select(selectors) : collection;
-        };
-    }
     
     
     /////
     
     
-    // ELEMENT API
+    // PABLO COLLECTIONS
     
     function PabloCollection(node, attr){
         if (node){
@@ -357,21 +348,28 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             }
         }
     }
-    
-    // Node prototype
     pabloCollectionApi = PabloCollection.prototype = [];
 
     extend(pabloCollectionApi, {
         collection: null,
         constructor: PabloCollection,
         pablo: pabloVersion,
-        
-        get: function(index){
-            return this[index];
-        },
+
+
+        /////
+
+        // ARRAY-LIKE BEHAVIOUR
 
         toArray: function(){
             return toArray(this);
+        },
+        
+        size: function(){
+            return this.length;
+        },
+        
+        get: function(index){
+            return this[index];
         },
         
         eq: function(index){
@@ -380,10 +378,6 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 Pablo(this[index]) :
                 // Return node, counting backwards from end of elements array
                 (index < -1 ? this.slice(index, index + 1) : this.slice(index));
-        },
-        
-        size: function(){
-            return this.length;
         },
 
         first: function(){
@@ -459,11 +453,11 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 Pablo(arrayProto.filter.call(this, fnOrSelector));
         },
 
-        indexOf: function(element){
-            if (Pablo.isPablo(element)){
-                element = element[0];
+        indexOf: function(el){
+            if (Pablo.isPablo(el)){
+                el = el[0];
             }
-            return arrayProto.indexOf.call(this, element);
+            return arrayProto.indexOf.call(this, el);
         },
 
 
@@ -472,58 +466,31 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // TRAVERSAL
 
-        children: traverse('childNodes'),
-        next: traverse('nextElementSibling'),
-        prev: traverse('previousElementSibling'),
-        parent: traverse('parentNode'),
+        // See below for traversal shortcuts using `relations()` e.g. `parents()`
 
-        // NOTE: `parent` and `parents` matches jQuery's behaviour:
-        // the former allows `document` in the response; the latter excludes it.
-        // `checkType` is for internal use; it is a comparison function and stops
-        // the loop when it returns false; see parentsSvg() and matchSelectors()
-        parents: function(selectors, checkType){
-            var parents = Pablo();
-
-            if (typeof checkType === 'undefined'){
-                checkType = isElement;
-            }
+        relations: function(prop, selectors, doWhile){
+            var collection = Pablo(),
+                isFn = typeof doWhile === 'function';
 
             this.each(function(el){
-                el = el.parentNode;
-                // Check element has parent and, if `checkType` isn't falsey, use it to
-                // check the element's type
-                while (el && (checkType ? checkType(el) : true)){
-                    parents.push(el);
-                    el = el.parentNode;
+                el = el[prop];
+                while (el && (isFn ? doWhile(el) : true)){
+                    collection.push(el);
+                    el = doWhile ?
+                        el[prop] : null;
                 }
             });
-            return selectors ? parents.select(selectors) : parents;
+            return selectors ? collection.select(selectors) : collection;
         },
 
-        // Same as parents() but only returns SVG nodes
-        parentsSvg: function(selectors){
-            return this.parents(selectors, isSvg);
+        siblings: function(selectors){
+            return this.prevSiblings(selectors)
+                       .push(this.nextSiblings(selectors));
         },
 
         // Find each element's SVG root element
         root: function(selectors){
-            // Find the SVG element ancestors and return those that have a non-SVG parent
-            return this.parentsSvg(selectors).select(function(el){
-                return !isSvg(el.parentNode);
-            });
-        },
-
-        siblings: function(selectors){
-            var siblings = Pablo();
-
-            this.each(function(el){
-                siblings.push(
-                    Pablo(el).parent().children().select(function(child){
-                        return el !== child;
-                    })
-                );
-            });
-            return selectors ? siblings.select(selectors) : siblings;
+            return this.owners(selectors).last();
         },
         
         find: function(selectors){
@@ -541,14 +508,6 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // MANIPULATION
         
-        empty: function(){
-            return this.each(function(el){
-                while (el.firstChild) {
-                    el.removeChild(el.firstChild);
-                }
-            });
-        },
-        
         remove: function(){
             return this.each(function(el){
                 var parentNode = el.parentNode;
@@ -556,6 +515,11 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                     parentNode.removeChild(el);
                 }
             });
+        },
+        
+        empty: function(){
+            this.children().remove();
+            return this;
         },
         
         // NOTE: the following append-related functions all require attr to exist, even as a blank object, if a new element is to be created. Otherwise, if the first argument is a string, then a selection operation will be performed.
@@ -716,7 +680,6 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         pluck: function(attr){
             return toArray(this).map(function(el){
                 return Pablo(el).attr(attr);
-
             });
         },
 
@@ -770,6 +733,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 attr = attr.slice(colonIndex+1);
             }
             return this.each(function (el){
+                // TODO: does `removeAttribute` behave differently?
                 el.removeAttributeNS(nsURI || null, attr);
             });
         },
@@ -795,7 +759,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             if (typeof styles === 'string'){
                 // Get style
                 if (typeof value === 'undefined'){
-                    el = this.get(0);
+                    el = this[0];
                     return el && el.style.getPropertyValue(styles);
                     // or document.defaultView.getComputedStyle(el, null).getPropertyValue(styles);
                 }
@@ -837,7 +801,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     /////
 
 
-    // DOM EVENT METHODS
+    // DOM EVENTS
 
     (function(){
         // Allow either single or multiple events to be triggered
@@ -894,8 +858,36 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         });
     }());
 
-    // Pablo Collection API Aliases
+
+    /////
+
+
+    // API SHORTCUTS
+
+    function walk(prop, doWhile){
+        return function(selectors){
+            return this.relations(prop, selectors, doWhile);
+        }
+    }
+
     extend(pabloCollectionApi, {
+        // Traversal methods
+        children:     walk('childNodes',             null),
+        firstChild:   walk('firstChild',             null),
+        lastChild:    walk('lastChild',              null),
+        prev:         walk('previousElementSibling', null),
+        prevSiblings: walk('previousElementSibling', true),
+        next:         walk('nextElementSibling',     null),
+        nextSiblings: walk('nextElementSibling',     true),
+        viewport:     walk('viewportElement',        null),
+        viewports:    walk('viewportElement',        true),
+        owner:        walk('ownerSVGElement',        null),
+        owners:       walk('ownerSVGElement',        true),
+        parent:       walk('parentNode',             null),
+        parents:      walk('parentNode',             isElement),
+        parentsSvg:   walk('parentNode',             isSVGElement),
+
+        // Alias methods
         elements: pabloCollectionApi.toArray,
         add:      pabloCollectionApi.push,
         concat:   pabloCollectionApi.push,
@@ -907,7 +899,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     /////
 
     
-    // CSS CLASS METHODS
+    // CSS CLASSES
 
     cssClassApi = supportsClassList ?
 
@@ -1057,9 +1049,9 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         select: selectPablo,
         isArrayLike: isArrayLike,
         isElement: isElement,
+        isSVGElement: isSVGElement,
         isNodeList: isNodeList,
         isHTMLDocument: isHTMLDocument,
-        isSvg: isSvg,
         // isPablo is overwritten in functional.js extension
         isPablo: function(obj){
             return obj instanceof Pablo.Collection;
