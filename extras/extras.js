@@ -1,6 +1,8 @@
 (function(window, Pablo, MindMap, JSON){
     'use strict';
 
+    // TODO: fix bug where editing a parent's text doesn't update the child's path offset
+
     var localStorage = window.localStorage;
 
     Pablo.extend(MindMap.prototype, {
@@ -24,10 +26,10 @@
                 .css('cursor', 'pointer')
                 .duplicate(3)
                 .attr({
-                    'data-action': ['delete', 'edit', 'save', 'restore'],
+                    'data-action': ['edit', 'delete', 'save', 'restore'],
                     'xlink:href': [
-                        'images/bin-3.svg',
                         'images/pencil.svg',
+                        'images/bin-3.svg',
                         'images/arrow-down.svg',
                         'images/arrow-up.svg'
                     ]
@@ -36,8 +38,8 @@
                     return '0 ' + (i * 28);
                 })
                 .title().content([
-                    'Delete node',
                     'Edit node',
+                    'Delete node',
                     'Save map',
                     'Restore map'
                 ]);
@@ -47,15 +49,15 @@
 
                 if (target.hasClass('icon')){
                     switch (target.attr('data-action')){
-                        case 'delete':
-                        if (mindmap.selected){
-                            mindmap.deleteNode(mindmap.selected);
-                        }
-                        break;
-
                         case 'edit':
                         if (mindmap.selected){
                             mindmap.editNode(mindmap.selected);
+                        }
+                        break;
+
+                        case 'delete':
+                        if (mindmap.selected){
+                            mindmap.deleteNode(mindmap.selected);
                         }
                         break;
 
@@ -156,31 +158,35 @@
         // DELETION
 
         deleteNode: function(nodeData){
-            var nodeId = nodeData.id;
+            var nodeId;
 
-            // Remove DOM elements
-            nodeData.node.remove();
-            nodeData.path.remove();
+            if (window.confirm('Are you sure?')){
+                nodeId = nodeData.id;
 
-            // Delete data stored in memory
-            delete this.cache[nodeId];
+                // Remove DOM elements
+                nodeData.node.remove();
+                nodeData.path.remove();
 
-            // Delete child nodes
-            Object.keys(this.cache)
-                .filter(function(testId){
-                    return nodeId === this.cache[testId].parentId;
-                }, this)
-                .forEach(function(nodeId){
-                    this.deleteNode(this.cache[nodeId]);
-                }, this);
+                // Delete data stored in memory
+                delete this.cache[nodeId];
 
-            // If this node is `selected` then select the parent node
-            if (this.selected && this.selected.id === nodeId){
-                if (this.selected.parentId){
-                    this.makeSelected(this.selected.parentId);
-                }
-                else {
-                    this.selected = null;
+                // Delete child nodes
+                Object.keys(this.cache)
+                    .filter(function(testId){
+                        return nodeId === this.cache[testId].parentId;
+                    }, this)
+                    .forEach(function(nodeId){
+                        this.deleteNode(this.cache[nodeId]);
+                    }, this);
+
+                // If this node is `selected` then select the parent node
+                if (this.selected && this.selected.id === nodeId){
+                    if (this.selected.parentId){
+                        this.makeSelected(this.selected.parentId);
+                    }
+                    else {
+                        this.selected = null;
+                    }
                 }
             }
 
