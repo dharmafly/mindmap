@@ -396,6 +396,8 @@
                         }
                     }
                 })
+
+                // TODO: set this event on the node element, on dragstart
                 .on('mousemove', function(event){
                     if (mindmap.dragging){
                         mindmap.drag(event.pageX, event.pageY);
