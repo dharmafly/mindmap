@@ -3,27 +3,160 @@
 (function(window){
     'use strict';
 
-    // Create a JavaScript `MindMap` constructor that can
-    // be called with `new MindMap('#my-container');`
-    function MindMap(htmlContainer){
-        this.init(htmlContainer);
+    // `settings` must contain: `id`, `parentId`, `dx`, `dy`
+    // and may also contain: `title`
+    function MindMapNode(settings){
+        Pablo.extend(this, settings);
+        this.createElements()
+            .setText(settings.title)
+            .setPosition(settings.dx, settings.dy);
     }
 
-    // Create properties and methods for `MindMap` objects
-    MindMap.prototype = {
+    MindMapNode.prototype = {
         // SETTINGS
-
         PADDING_X: 6,
         PADDING_Y: 4,
         CORNER_R: 7,
         PATH_CURVE: 30,
         FONTSIZE: 20,
-        nextId: 1,
 
+        // CREATE AND UPDATE DOM ELEMENTS
+
+        createElements: function(){
+            // Append a <g> group element to the parent to represent the 
+            // mindmap node in the DOM
+            this.dom = this.parent.dom.g()
+                .addClass('node')
+                .data('node', this);
+
+            // Append a <rect> rectangle element
+            this.dom.rect({rx: this.CORNER_R});
+
+            // Append a <text> element, with padding
+            this.dom.text({
+                x: this.PADDING_X,
+                y: this.FONTSIZE,
+                'font-size': this.FONTSIZE
+            });
+
+            if (this.parent.id){
+                // Create a <path> element to visually connect the 
+                // parent and node. Its coordinates are set by the 
+                // `setPosition` method. We prepend it so that 
+                // it appears beneath the parent's rectangle.
+                this.path = Pablo.path().prependTo(this.parent.dom);
+            }
+            return this;
+        },
+
+        setText: function(title){
+            var textElem, bbox;
+
+            // Set the <text> element's contents
+            textElem = this.dom.find('text').content(title);
+
+            // Get the <text>'s rendered dimensions. `getBBox()` is a native SVG DOM method
+            bbox = textElem[0].getBBox();
+            
+            // Cache the width and height - e.g. for use when drawing the path
+            // Add padding for the rectangle's dimensions and update the node data
+            // TODO: explain why 2*x but only 1*y; it's due to text baseline position and 
+            this.width  = bbox.width + this.PADDING_X * 2;
+            this.height = bbox.height + this.PADDING_Y;
+
+            // Update the cached data and apply to the <rect> element
+            this.dom.find('rect').attr({
+                width:  this.width,
+                height: this.height
+            });
+            return this.setPath();
+        },
+
+        setPosition: function(dx, dy){
+            this.dx = dx;
+            this.dy = dy;
+
+            // Translate the node to the new coordinates
+            this.dom.transform('translate', dx, dy);
+
+            // TODO: avoid setPath if already set by setText?
+            return this.setPath();
+        },
+
+        setPath: function(){
+            // Update the path drawn between the parent and node.
+            // Calculate the curve and set the element's `d` (data) attribute 
+            // with the path data
+            if (this.path){
+                this.path.attr('d', this.getPathData());
+            }
+            return this;
+        },
+
+
+        // CALCULATE PATH'S CURVE
+
+        // Draw a path from the parent to the child
+        // `p` = parentData, `n` = nodeData
+        getPathData: function(){
+            var // Is the node to the left or above the parent?
+                isLeft  = this.dx + (this.width  / 2) < 0,
+                isAbove = this.dy + (this.height / 2) < 0,
+
+                // The curve connects the two points x1,y1 to x2,y2.
+                // x1,y1 is at the parent node's side edge and halfway up.
+                // Note that, in this example, x2,y2 is *relative* to x1,y2.
+                x1 = isLeft ? 0 : this.parent.width,
+                y1 = this.parent.height / 2,
+
+                // The curve stops at the node's side and halfway up.
+                x2 = this.dx + (isLeft ? this.width : -x1),
+                y2 = this.dy,
+
+                // The curve has a 'control point', to determine the amount and 
+                // direction it deviates away from being a straight line. The 
+                // control point is positioned a little distance away from a 
+                // point halfway the path.
+                curve = this.PATH_CURVE,
+                controlX = x2 / 2 + (isLeft ? curve : -curve),
+                controlY = y2 / 2 + (isAbove ? -curve : curve);
+
+            return 'm' + x1 + ' ' + y1 +
+                   'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
+        },
+
+        dragStart: function(x, y){
+            // Store data about the node being dragged
+            // The offset is the distance between the node's x,y origin and the mouse cursor
+            this.dragOffsetX = x - this.dx;
+            this.dragOffsetY = y - this.dy;
+            return this;
+        },
+
+        drag: function(x, y){
+            // Remove the offset between the node's x,y origin and the mouse cursor
+            var dx = x - this.dragOffsetX,
+                dy = y - this.dragOffsetY;
+            return this.setPosition(dx, dy);
+        }
+    };
+
+    /////
+
+    // Create a JavaScript `MindMap` constructor that can
+    // be called with `new MindMap('#my-container');`
+    function MindMap(htmlContainer){
+        this.create(htmlContainer);
+    }
+
+    // Create properties and methods for `MindMap` objects
+    MindMap.prototype = {
+        // SETTINGS
+        nextId: 1,
 
         // INITIALISE MINDMAP
 
-        init: function(htmlContainer){
+        create: function(htmlContainer){
             /* Wrap the HTML container element(s) as a Pablo 'collection', and
             empty it (i.e. remove any child nodes).
 
@@ -38,9 +171,10 @@
                    `collection.svg({width:400, height:'60%'})`
             */
             this.svg = container.svg();
+            this.rootNode = {id:0, dx:0, dy:0, dom:this.svg};
 
-            // Create a simple object cache in memory
-            this.cache = {};
+            // An array to store the nodes, in case we want to access them later
+            this.nodes = [];
 
             /* Add instructions and setup event handlers for user interaction.
             Most methods return `this`, (which is the `MindMap` object), to 
@@ -49,15 +183,81 @@
                 `Pablo('#foo.bar').siblings().attr({x:1})`
             */
             return this.setupEvents()
-                       .addInstructions();
+                       .addInstructions()
+                       .makeSelected(this.rootNode);
+        },
+
+        setupEvents: function(){
+            var mindmap = this;
+
+            // Delegate multiple event handlers to the <svg> element
+            // This performs better than setting click handlers on every
+            // node element in the map.
+            this.svg
+                // On (only) the first mouse down, remove instructions.
+                .one('mousedown', function(){
+                    mindmap.removeInstructions();
+                })
+
+                // On every mouse down, if clicking on the rect or text inside 
+                // a node, then select the node.
+                .on('mousedown', '.node text, .node rect', function(event){
+                    var node, dragHandler, dragStop;
+
+                    // Left mouse button was pressed
+                    if (event.which === 1){
+                        // Wrap the event target as a Pablo collection
+                        node = Pablo(event.target).parent().data('node');
+                        mindmap.makeSelected(node);
+                        node.dragStart(event.pageX, event.pageY);
+
+                        // Now the drag has started, drag the node when the mouse moves over // the svg element
+                        dragHandler = function(event){
+                            node.drag(event.pageX, event.pageY);
+                        };
+
+                        dragStop = function(event){
+                            var rel;
+                            // This handles the edge-case where a node is being 
+                            // dragged and the mouse exits the SVG, then releases
+                            // the mouse button. We detect this and stop dragging
+                            if (event.type === 'mouseout'){
+                                // `relatedTarget` is what the mouse entered when
+                                // it left the <svg> element. `this` is the <svg>.
+                                // if the `mouseout` was triggered by moving only 
+                                // between SVG elements, then do nothing
+                                rel = event.relatedTarget;
+                                if (rel && rel === this || rel.ownerSVGElement === this){
+                                    return;
+                                }
+                            }
+                            // Stop dragging by removing the drag-related handlers
+                            mindmap.svg
+                                .off('mousemove', dragHandler)
+                                .off('mousup mouseout', dragStop);
+                        };
+
+                        // Start dragging by adding the drag-related handlers
+                        mindmap.svg
+                            .on('mousemove', dragHandler)
+                            .on('mouseup mouseout', dragStop);
+
+                        event.stopPropagation();
+                    }
+                }, true)
+
+                // We make `useCapture` true to prevent it propagating to the function below
+                .on('mousedown', function(event){
+                    // Left mouse button was pressed
+                    if (event.which === 1){
+                        mindmap.askForNode(event.pageX, event.pageY);
+                    }
+                });
+            return this;
         },
 
 
         // CREATE MINDMAP NODES
-
-        getId: function(node){
-            return node && Number(node.attr('data-id'));
-        },
 
         askTitle: function(){
             var title = window.prompt('What?');
@@ -65,261 +265,66 @@
         },
 
         // Ask the user what text to put in a new node
-        createNode: function(x, y){
-            var title = this.askTitle(),
-                parent = this.selected && this.selected.node ||
-                    this.svg.find('.node').eq(0);
+        askForNode: function(x, y){
+            var title = this.askTitle();
 
             if (title){
-                this.drawNodeAbsolute({
-                    parentId: this.getId(parent),
-                    title: title
-                }, x, y);
+                this.createNode({dx:x, dy:y, title:title}, true);
             }
             return this;
         },
 
-        // `nodeData` must contain: `parentId`, `dx`, `dy`
-        // it may also contain: `id`, `title`
-        drawNode: function(nodeData){
-            // If there's no parent (e.g. for the first node), append to the SVG root
-            var parent = nodeData.parentId ?
-                    this.cache[nodeData.parentId].node : this.svg;
+        createNode: function(settings, isAbsolute){
+            var node, parent;
 
             // If there's no specified id, generate a new id
-            if (!nodeData.id){
-                nodeData.id = this.nextId ++;
+            if (!settings.id){
+                settings.id = this.nextId ++;
             }
 
-            // Store data about the node in a lookup object
-            this.cache[nodeData.id] = nodeData;
-            
-            // Update the node's text and position, and mark it `selected`
-            return this.createElements(nodeData, parent)
-                       .updateText(nodeData, nodeData.title)
-                       .updatePosition(nodeData, nodeData.dx, nodeData.dy);
-        },
-
-        getRelativeCoords: function(nodeData, x, y){
-            while (nodeData = this.cache[nodeData.parentId]){
-                x -= nodeData.dx;
-                y -= nodeData.dy;
+            // If there's no parent (e.g. for the first node), append to the SVG root
+            if (!settings.parent){
+                settings.parent = this.selected;
             }
-            return {x:x, y:y};
-        },
 
-        drawNodeAbsolute: function(nodeData, x, y){
-            // Calculate x, y coordinates relative to the parent node
-            var delta = this.getRelativeCoords(nodeData, x, y);
-            nodeData.dx = delta.x;
-            nodeData.dy = delta.y;
+            // If a mouse event triggered this, using absolute page coordinates
+            if (isAbsolute){
+                parent = settings.parent;
 
-            return this.drawNode(nodeData);
-        },
+                // Calculate x, y coordinates relative to the parent node
+                while (parent){
+                    settings.dx -= parent.dx;
+                    settings.dy -= parent.dy;
+                    parent = parent.parent;
+                }
+            }
 
+            // Create new node instance
+            node = new MindMapNode(settings);
+            this.nodes.push(node);
 
-        // CREATE AND UPDATE DOM ELEMENTS
-
-        createElements: function(nodeData, parent){
-            var node, rect, text, path;
-
-            // Append a <g> group element to the parent to represent the 
-            // mindmap node in the DOM
-            node = parent.g({'data-id': nodeData.id}).addClass('node');
-
-            // Append a <rect> rectangle element
-            rect = node.rect({rx: this.CORNER_R});
-
-            // Append a <text> element, with padding
-            text = node.text({
-                x: this.PADDING_X,
-                y: this.FONTSIZE,
-                'font-size': this.FONTSIZE
-            });
-
-            // Create a <path> element to visually connect the 
-            // parent and node. Its coordinates are set by the 
-            // `updatePosition` method. We prepend it so that 
-            // it appears beneath the parent's rectangle.
-            path = Pablo.path().prependTo(parent);
-
-            // Extend the cached lookup object to give quick access to the elements
-            Pablo.extend(nodeData, {node:node, rect:rect, text:text, path:path});
-
-            return this;
-        },
-
-        updateText: function(nodeData, title){
-            var text = nodeData.text,
-                rect = nodeData.rect,
-                bbox;
-
-            // Set the text element's contents
-            text.content(title);
-
-            // Get the text's rendered dimensions. `getBBox()` is a native SVG DOM method
-            bbox = text[0].getBBox();
-            
-            // Add properties to nodeData
-            Pablo.extend(nodeData, {
-                title:  title,
-                // Add padding for the rectangle's dimensions and update the node data
-                // TODO: explain why 2*x but only 1*y; it's due to text baseline position and text x position having padding already applied
-                width:  bbox.width + this.PADDING_X * 2,
-                height: bbox.height + this.PADDING_Y
-            });
-
-            // Update the cached data and apply to the <rect> element
-            rect.attr({
-                width: nodeData.width,
-                height: nodeData.height
-            });
-
-            return this.updatePath(nodeData);
-        },
-
-        updatePosition: function(nodeData, dx, dy){
-            var node = nodeData.node;
-
-            // Update the cached node data
-            nodeData.dx = dx;
-            nodeData.dy = dy;
-
-            // Translate the node to the new coordinates
-            node.transform('translate', dx, dy);
-
-            // Update the path drawn between the parent and node
-            return this.updatePath(nodeData);
-        },
-
-        updatePath: function(nodeData){
-            // Get the <path> element
-            var path = nodeData.path,
-                parentData = this.cache[nodeData.parentId],
-                pathData;
-
-            if (parentData){
-                // Calculate the curve between the parent and node
-                pathData = this.getPathData(nodeData, parentData);
-
-                // Set the element's `d` (data) attribute with the path data
-                path.attr('d', pathData);
+            if (this.selected.dom === this.svg){
+                this.makeSelected(node);
             }
             return this;
         },
-
-
-        // CALCULATE PATH'S CURVE
-
-
-        // Draw a path from the parent to the child
-        // `p` = parentData, `n` = nodeData
-        getPathData: function(n, p){
-            var // Is the node to the left or above the parent?
-                isLeft  = n.dx + (n.width  / 2) < 0,
-                isAbove = n.dy + (n.height / 2) < 0,
-
-                // The curve connects the two points x1,y1 to x2,y2.
-                // x1,y1 is at the parent node's side edge and halfway up.
-                // Note that, in this example, x2,y2 is *relative* to x1,y2.
-                x1 = isLeft ? 0 : p.width,
-                y1 = p.height / 2,
-
-                // The curve stops at the node's side and halfway up.
-                x2 = n.dx + (isLeft ? n.width : -x1),
-                y2 = n.dy,
-
-                // The curve has a 'control point', to determine the amount and 
-                // direction it deviates away from being a straight line. The 
-                // control point is positioned a little distance away from a 
-                // point halfway the path.
-                curve = this.PATH_CURVE,
-                controlX = x2 / 2 + (isLeft ? curve : -curve),
-                controlY = y2 / 2 + (isAbove ? -curve : curve);
-
-            return 'm' + x1 + ' ' + y1 +
-                   'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
-        },
-
-        /*
-        xgetPathData: function(n, p){
-            var // Is the node to the left or above the parent?
-                isLeft  = n.dx + (n.width  / 2) < 0,
-                isAbove = n.dy + (n.height / 2) < 0,
-
-                // The curve connects the two points x1,y1 to x2,y2.
-                // x1,y1 is at the parent node's side edge and halfway up.
-                // Note that, in this example, x2,y2 is *relative* to x1,y2.
-                x1 = p.width / 2,
-                y1 = isAbove ? 0 : p.height,
-
-                // The curve stops at the node's side and halfway up.
-                x2 = n.dx - x1 + n.width / 2,
-                y2 = n.dy - y1 + (isAbove ? n.height : 0),
-
-                // The curve has a 'control point', to determine the amount and 
-                // direction it deviates away from being a straight line. The 
-                // control point is positioned a little distance away from a 
-                // point halfway the path.
-                curve = this.PATH_CURVE,
-                controlX = x2 / 2 + (isLeft ? -curve : curve),
-                controlY = y2 / 2 + (isAbove ? curve : -curve);
-
-            return 'm' + x1 + ' ' + y1 +
-                   'q' + controlX + ' ' + controlY + ',' + x2  + ' ' + y2;
-        },
-        */
 
 
         // SELECT NODE
 
-        makeSelected: function(nodeId){
-            var nodeData = this.cache[nodeId];
-
+        makeSelected: function(node){
             // De-selected currently selected node
             if (this.selected){
-                this.selected.node.removeClass('selected');
+                this.selected.dom.removeClass('selected');
             }
 
             // Store node as `mindmap.selected` property
-            this.selected = nodeData;
+            this.selected = node;
 
-            nodeData.node.addClass('selected')
+           node.dom.addClass('selected')
                 // Bring to front, so that it appears on top of other nodes
-                .appendTo(nodeData.node.parent());
+                .appendTo(node.dom.parent());
 
-            return this;
-        },
-
-
-        // DRAG NODE
-
-        dragStart: function(nodeId, x, y){
-            var nodeData = this.cache[nodeId];
-
-            // Store data about the node being dragged
-            // The offset is the distance between the node's x,y origin and the mouse cursor
-            this.dragging = {
-                nodeData: nodeData,
-                offsetX: x - nodeData.dx,
-                offsetY: y - nodeData.dy
-            };
-            return this;
-        },
-
-        drag: function(x, y){
-            // Retrieve the stored data about the node being dragged
-            var d = this.dragging,
-                // Remove the offset between the node's x,y origin and the mouse cursor
-                dx = x -= d.offsetX,
-                dy = y -= d.offsetY;
-
-            // Update the node's position
-            return this.updatePosition(d.nodeData, dx, dy);
-        },
-
-        dragStop: function(){
-            this.dragging = null;
             return this;
         },
 
@@ -346,88 +351,6 @@
         // Remove the instructions <text> element
         removeInstructions: function(){
             this.svg.find('.instructions').remove();
-            return this;
-        },
-
-
-        // EVENT HANDLERS
-
-        // If the target element is the outer container for a 
-        // mindmap node, then return it. Otherwise, walk up through
-        // the element's DOM and return the nextIdt container
-        nearestNode: function(el){
-            var node = Pablo(el);
-            return node.hasClass('node') ?
-                node : node.parents('.node').first();
-        },
-
-        setupEvents: function(){
-            var mindmap = this;
-
-            // Delegate multiple event handlers to the <svg> element
-            // This performs better than setting click handlers on every
-            // node element in the map.
-            this.svg
-                // On (only) the first mouse down, remove instructions.
-                .one('mousedown', function(){
-                    mindmap.removeInstructions();
-                })
-
-                // On every mouse down, if clicking on existing node,
-                // then select it. Otherwise, create a new one.
-                .on('mousedown', function(event){
-                    var nodeId, node, x, y;
-
-                    // Left mouse button was pressed
-                    if (event.which === 1){
-                        // Determine if the click target was a node
-                        // element or one of its children.
-                        node = mindmap.nearestNode(event.target);
-                        x = event.pageX;
-                        y = event.pageY;
-
-                        if (node.length){
-                            nodeId = node.attr('data-id');
-                            mindmap.makeSelected(nodeId);
-                            mindmap.dragStart(nodeId, x, y);
-                        }
-                        else if (event.target === mindmap.svg[0]) {
-                            mindmap.createNode(x, y);
-                        }
-                    }
-                })
-
-                // TODO: set this event on the node element, on dragstart
-                .on('mousemove', function(event){
-                    if (mindmap.dragging){
-                        mindmap.drag(event.pageX, event.pageY);
-                    }
-                })
-                .on('mouseup', function(){
-                    if (mindmap.dragging){
-                        mindmap.dragStop();
-                    }
-                })
-
-                // When the mouse leaves the SVG element, stop dragging
-                // E.g. this prevents the mouse dragging out of the window, the mouse
-                // button released _outside_ the window and returning, still dragging
-                .on('mouseout', function(event){
-                    var to, isSvg;
-
-                    if (mindmap.dragging){
-                        // Which element is the mouse entering?
-                        to = event.relatedTarget;
-
-                        // Is that element the SVG root or one of its children?
-                        isSvg = to && (to === mindmap.svg[0] || to.ownerSVGElement === mindmap.svg[0]);
-
-                        // Stop dragging when the mouse leaves the SVG element
-                        if (!isSvg){
-                            mindmap.dragStop(event);
-                        }
-                    }
-                });
             return this;
         }
     };

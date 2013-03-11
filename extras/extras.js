@@ -1,3 +1,5 @@
+/*global Pablo*/
+/*jshint newcap:false*/
 (function(window, Pablo, MindMap, JSON){
     'use strict';
 
@@ -7,7 +9,9 @@
 
     Pablo.extend(MindMap.prototype, {
         resetUi: function(){
-            this.svg.find('.instructions,.node,path').remove();
+            this.svg.find('.instructions,.node').remove();
+            this.nodes.length = 0;
+            this.selected = this.rootNode;
             return this;
         },
 
@@ -26,6 +30,7 @@
                 .css('cursor', 'pointer')
                 .duplicate(3)
                 .attr({
+                    // data- attributes are similar to setting .data()
                     'data-action': ['edit', 'delete', 'save', 'restore'],
                     'xlink:href': [
                         'images/pencil.svg',
@@ -44,33 +49,30 @@
                     'Restore map'
                 ]);
 
-            actions.on('click', function(event){
-                var target = Pablo(event.target);
-
-                if (target.hasClass('icon')){
-                    switch (target.attr('data-action')){
-                        case 'edit':
-                        if (mindmap.selected){
-                            mindmap.editNode(mindmap.selected);
-                        }
-                        break;
-
-                        case 'delete':
-                        if (mindmap.selected){
-                            mindmap.deleteNode(mindmap.selected);
-                        }
-                        break;
-
-                        case 'save':
-                        mindmap.saveState();
-                        break;
-
-                        case 'restore':
-                        mindmap.restoreState();
-                        break;
+            actions.on('mousedown', '.icon', function(event){
+                switch (Pablo(event.target).attr('data-action')){
+                    case 'edit':
+                    if (mindmap.selected){
+                        mindmap.editNode(mindmap.selected);
                     }
+                    break;
+
+                    case 'delete':
+                    if (mindmap.selected){
+                        mindmap.deleteNode(mindmap.selected);
+                    }
+                    break;
+
+                    case 'save':
+                    mindmap.saveState();
+                    break;
+
+                    case 'restore':
+                    mindmap.restoreState();
+                    break;
                 }
-            });
+                event.stopPropagation();
+            }, true);
 
             return this;
         },
@@ -98,23 +100,16 @@
         // The minimum node data in memory necessary to recreate
         // the map is saved in localStorage and can be later restored
         saveState: function(){
-            var cache = this.cache,
-                // Ensure we pre-sort the node ids on save, to
-                // maximise load performance
-                nodeIds = Object.keys(cache).sort(function(a, b){
-                    return Number(a) - Number(b);
-                }),
+            var nodes = this.nodes,
                 nodesData;
 
-            nodesData = nodeIds.map(function(nodeId){
-                var nodeData = cache[nodeId];
-
+            nodesData = nodes.map(function(node){
                 return {
-                    id:       nodeData.id,
-                    parentId: nodeData.parentId,
-                    title:    nodeData.title,
-                    dx:       nodeData.dx,
-                    dy:       nodeData.dy
+                    id:       node.id,
+                    parentId: node.parent && node.parent.id,
+                    title:    node.title,
+                    dx:       node.dx,
+                    dy:       node.dy
                 };
             });
 
@@ -129,8 +124,15 @@
                 this.resetUi();
 
                 // Draw every node in the stored cache
-                nodesData.forEach(function(nodeData){
-                    this.drawNode(nodeData);
+                nodesData.forEach(function(settings){
+                    this.nodes.some(function(cachedNode){
+                        if (cachedNode.id === settings.parentId){
+                            settings.parent = cachedNode;
+                            return true;
+                        }
+                    }, this);
+
+                    this.createNode(settings);
                 }, this);
 
                 // Set the next id counter to the latest node
@@ -144,11 +146,11 @@
 
         // EDITING
 
-        editNode: function(nodeData){
+        editNode: function(node){
             var title = this.askTitle();
 
             if (title){
-                this.updateText(nodeData, title);
+                node.setText(title);
             }
             return this;
         },
@@ -157,36 +159,33 @@
 
         // DELETION
 
-        deleteNode: function(nodeData){
-            var nodeId;
+        deleteNode: function(node, silent){
+            var cacheIndex;
 
-            if (window.confirm('Are you sure?')){
-                nodeId = nodeData.id;
-
+            if (silent || window.confirm('Are you sure?')){
                 // Remove DOM elements
-                nodeData.node.remove();
-                nodeData.path.remove();
+                node.dom.remove();
+
+                if (node.path){
+                    node.path.remove();
+                }
 
                 // Delete data stored in memory
-                delete this.cache[nodeId];
+                cacheIndex = this.nodes.indexOf(node);
+                delete this.nodes[cacheIndex];
 
                 // Delete child nodes
-                Object.keys(this.cache)
-                    .filter(function(testId){
-                        return nodeId === this.cache[testId].parentId;
+                this.nodes
+                    .filter(function(cachedNode){
+                        return cachedNode.parent.id === node.id;
                     }, this)
-                    .forEach(function(nodeId){
-                        this.deleteNode(this.cache[nodeId]);
+                    .forEach(function(cachedNode){
+                        this.deleteNode(cachedNode, true);
                     }, this);
 
                 // If this node is `selected` then select the parent node
-                if (this.selected && this.selected.id === nodeId){
-                    if (this.selected.parentId){
-                        this.makeSelected(this.selected.parentId);
-                    }
-                    else {
-                        this.selected = null;
-                    }
+                if (this.selected.id === node.id){
+                    this.makeSelected(node.parent);
                 }
             }
 
