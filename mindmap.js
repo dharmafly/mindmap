@@ -3,8 +3,8 @@
 (function(window){
     'use strict';
 
-    // `settings` must contain: `id`, `parentId`, `dx`, `dy`
-    // and may also contain: `title`
+    // `settings` must contain: `id`, `dx`, `dy`
+    // and may also contain: `parent` & `title`
     function MindMapNode(settings){
         Pablo.extend(this, settings);
         this.createElements()
