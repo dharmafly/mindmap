@@ -150,7 +150,12 @@
             var title = this.askTitle();
 
             if (title){
-                node.setText(title);
+                node.setText(title)
+                    .dom.children('.node').each(function(el){
+                        Pablo(el).data('node').setPath();
+                    }, this);
+
+                // TODO: update children's paths
             }
             return this;
         },

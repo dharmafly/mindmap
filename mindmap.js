@@ -1,29 +1,40 @@
 /*global Pablo*/
 /*jshint newcap:false*/
+// Create a self-calling anonymous function, to keep internal variables out of 
+// global scope.
 (function(window){
+    // Run the program in [JavaScript strict mode](https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Functions_and_function_scope/Strict_mode).
     'use strict';
 
-    // `settings` must contain: `id`, `dx`, `dy`
-    // and may also contain: `parent` & `title`
+    // ## 'MindMapNode' constructor
+    // Set up a [new type of object](https://developer.mozilla.org/en-US/docs/JavaScript/Guide/Inheritance_and_the_prototype_chain), 
+    // called `MindMapNode`, to encapsulate all the functionality by the nodes 
+    // in the mindmap.
+    // Its constructor function accepts a `settings` argument, which must contain 
+    // `id`, `dx` & `dy` and may also contain `parent` & `title`.
     function MindMapNode(settings){
+        // Extend the node instance with any passed settings.
         Pablo.extend(this, settings);
+
+        // Create DOM elements and use them to display the settings.
         this.createElements()
             .setText(settings.title)
             .setPosition(settings.dx, settings.dy);
     }
 
+    // ## 'MindMapNode' prototype
+    // Add default properties and methods to `MindMapNode` instances.
     MindMapNode.prototype = {
-        // SETTINGS
+        // These settings are used in drawing the node.
         PADDING_X: 6,
         PADDING_Y: 4,
         CORNER_R: 7,
         PATH_CURVE: 30,
         FONTSIZE: 20,
 
-        // CREATE AND UPDATE DOM ELEMENTS
-
+        // Create DOM elements.
         createElements: function(){
-            // Append a <g> group element to the parent to represent the 
+            // Append a `<g>` group element to the parent to represent the 
             // mindmap node in the DOM
             this.dom = this.parent.dom.g()
                 .addClass('node')
@@ -49,11 +60,12 @@
             return this;
         },
 
+        // Update the node's text and redraw the path.
         setText: function(title){
             var textElem, bbox;
 
             // Set the <text> element's contents
-            textElem = this.dom.find('text').content(title);
+            textElem = this.dom.children('text').content(title);
 
             // Get the <text>'s rendered dimensions. `getBBox()` is a native SVG DOM method
             bbox = textElem[0].getBBox();
@@ -65,13 +77,14 @@
             this.height = bbox.height + this.PADDING_Y;
 
             // Update the cached data and apply to the <rect> element
-            this.dom.find('rect').attr({
+            this.dom.children('rect').attr({
                 width:  this.width,
                 height: this.height
             });
             return this.setPath();
         },
 
+        // Update the node's x,y position and redraw the path.
         setPosition: function(dx, dy){
             this.dx = dx;
             this.dy = dy;
@@ -83,6 +96,7 @@
             return this.setPath();
         },
 
+        // Update the path connecting the node and its parent.
         setPath: function(){
             // Update the path drawn between the parent and node.
             // Calculate the curve and set the element's `d` (data) attribute 
@@ -94,7 +108,7 @@
         },
 
 
-        // CALCULATE PATH'S CURVE
+        // Calculate the path's curve.
 
         // Draw a path from the parent to the child
         // `p` = parentData, `n` = nodeData
@@ -260,7 +274,7 @@
         // CREATE MINDMAP NODES
 
         askTitle: function(){
-            var title = window.prompt('What?');
+            var title = window.prompt('Type something...');
             return title && title.trim();
         },
 
