@@ -9,7 +9,8 @@
 
 */
 /*jshint newcap:false */
-var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocument){
+
+(function(root, Object, Array, Element, SVGElement, NodeList, HTMLDocument, document){
     'use strict';
     
     var /* SETTINGS */
@@ -17,9 +18,14 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         svgVersion = 1.1,
         svgns = 'http://www.w3.org/2000/svg',
         xlinkns = 'http://www.w3.org/1999/xlink',
-        vendorPrefixes = ['', '-moz-', '-webkit-', '-khtml-', '-o-', '-ms-'],
+        vendorPrefixes = ['', 'moz', 'webkit', 'khtml', 'o', 'ms'],
+        svgElements = 'a altGlyph altGlyphDef altGlyphItem animate animateColor animateMotion animateTransform circle clipPath color-profile cursor defs desc ellipse feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence filter font font-face font-face-format font-face-name font-face-src font-face-uri foreignObject g glyph glyphRef hkern image line linearGradient marker mask metadata missing-glyph mpath path pattern polygon polyline radialGradient rect script set stop style svg switch symbol text textPath title tref tspan use view vkern',
+        cacheExpando = 'pablo-data',
+        eventsNamespace = '__events__',
 
-        testElement, arrayProto, supportsClassList, hyphensToCamelCase, cssClassApi, pabloCollectionApi, classlistMethod;
+        head, testElement, arrayProto, supportsClassList, hyphensToCamelCase, 
+        camelCaseToHyphens, cssClassApi, pabloCollectionApi, classlistMethod, 
+        cssPrefixes, cache, cacheNextId, matchesProp;
 
     
     function make(elementName){
@@ -28,26 +34,55 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             null;
     }
 
+    function getPrefixedProperty(prop, context){
+        var capitalized = prop.slice(0,1).toUpperCase() + prop.slice(1),
+            found;
+
+        if (!context){
+            context = root;
+        }
+        vendorPrefixes.some(function(prefix){
+            var prefixedProp = prefix ? prefix + capitalized : prop;
+            if (prefixedProp in context){
+                found = prefixedProp;
+                return true;
+            }
+        });
+        return found;
+    }
+
 
     /////
 
 
     // TEST BROWSER COMPATIBILITY
 
-    testElement = document && 'createElementNS' in document && make('svg');
-    
-    // Incompatible browser
+    if (document){
+        testElement = 'createElementNS' in document && make('svg');
+        head = document.head || document.getElementsByTagName('head')[0];
+        arrayProto = Array && Array.prototype;
+        matchesProp = getPrefixedProperty('matches', testElement) ||
+            getPrefixedProperty('matchesSelector', testElement);
+    }
+
     if (!(
-        testElement &&
-        Array && Element && SVGElement && NodeList && HTMLDocument &&
+        testElement && head && arrayProto && matchesProp &&
+        Element && SVGElement && NodeList && HTMLDocument && 
         'createSVGRect' in testElement &&
-        'querySelectorAll' in document &&
-        'isArray' in Array &&
-        'forEach' in Array.prototype &&
-        'children' in document.body &&
-        'previousElementSibling' in document.body
+        'attributes' in testElement &&
+        'querySelectorAll' in testElement &&
+        'previousElementSibling' in testElement &&
+        'childNodes' in testElement &&
+        'create'     in Object &&
+        'keys'       in Object &&
+        'isArray'    in Array &&
+        'forEach'    in arrayProto &&
+        'map'        in arrayProto &&
+        'some'       in arrayProto &&
+        'every'      in arrayProto &&
+        'filter'     in arrayProto
     )){
-        // Return a simplified version of the Pablo API
+        // Incompatible browser: return a simplified version of the Pablo API
         return {
             v: pabloVersion,
             isSupported: false
@@ -55,7 +90,12 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     }
 
     supportsClassList = 'classList' in testElement;
-    arrayProto = Array.prototype;
+
+    cssPrefixes = vendorPrefixes.map(function(prefix){
+        return prefix ? '-' + prefix + '-' : '';
+    });
+
+    svgElements = 'a altGlyph altGlyphDef altGlyphItem animate animateColor animateMotion animateTransform circle clipPath color-profile cursor defs desc ellipse feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence filter font font-face font-face-format font-face-name font-face-src font-face-uri foreignObject g glyph glyphRef hkern image line linearGradient marker mask metadata missing-glyph mpath path pattern polygon polyline radialGradient rect script set stop style svg switch symbol text textPath title tref tspan use view vkern';
 
     
     /////
@@ -122,6 +162,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         return obj instanceof HTMLDocument;
     }
 
+    // Check if obj is an element from this or another document
     function hasSvgNamespace(obj){
         return obj && obj.namespaceURI && obj.namespaceURI === svgns;
     }
@@ -131,7 +172,8 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     }
     
     function canBeWrapped(obj){
-        return Pablo.isPablo(obj) ||
+        return typeof obj === 'string' ||
+            Pablo.isPablo(obj) ||
             isElement(obj) ||
             isNodeList(obj) ||
             isHTMLDocument(obj) ||
@@ -140,63 +182,12 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             hasSvgNamespace(obj);
     }
     
-    // Return node (with attributes) if a Pablo collection, otherwise create one
+    // Return node (with attributes) if a Pablo collection, otherwise create one.
     function toPablo(node, attr){
         if (Pablo.isPablo(node)){
             return attr ? node.attr(attr) : node;
         }
         return Pablo(node, attr);
-    }
-    
-    function addElementIfUnique(node, collection, prepend){
-        var toPush;
-        
-        // Create new element from elementName
-        if (typeof node === 'string'){
-            node = make(node);
-        }
-
-        // Is an existing element; check if already in collection
-        else if (isElement(node) || isHTMLDocument(node) || hasSvgNamespace(node)){
-            if (collection.indexOf(node) >= 0){
-                return;
-            }
-            // If the element is not yet in the collection, it will be added below
-        }
-
-        // Probably some kind of list of elements
-        else {
-            // A Pablo collection
-            if (Pablo.isPablo(node)){
-                // See extensions/functional.js for example usage of node.collection
-                // The check for node.collection is for extenstions/functional.js
-                toPush = node.collection || node;
-            }
-
-            // An array of elements
-            else if (Array.isArray(node)){
-                toPush = node;
-            }
-
-            // A nodeList (e.g. result of a selector query, or childNodes)
-            // or is an object like an array, e.g. a jQuery collection
-            else if (isNodeList(node) || isArrayLike(node)){
-                toPush = toArray(node);
-            }
-
-            // Whatever it is, it isn't supported
-            else {
-                return;
-            }
-
-            // Add each element in the list
-            return toPush.forEach(function(el){
-                addElementIfUnique(el, collection);
-            });
-        }
-
-        // Add element to collection
-        arrayProto[prepend ? 'unshift' : 'push'].call(collection, node);
     }
 
     // Return CSS styles with browser vendor prefixes
@@ -204,35 +195,33 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     // e.g. cssPrefix('transform', 'rotate(45deg)') will return a string sequence of prefixed CSS properties, each assigned the same value
     // e.g. cssPrefix('transform') will return a string sequence of CSS properties
     function cssPrefix(styles, value){
-        var vendorPrefixes = Pablo.vendorPrefixes,
-            prop, res, rule, setStyle;
+        var prop, res, rule, setStyle;
         
         if (typeof styles === 'object'){
-            setStyle = function(prefix){
-                res[prefix + prop] = styles[prop];
-            };
-
             res = {};
-            for (prop in styles){
-                if (styles.hasOwnProperty(prop)){
-                    vendorPrefixes.forEach(setStyle);
+            setStyle = function(prefix){
+                res[prefix + styleProperty] = styles[styleProperty];
+            };
+            for (var styleProperty in styles){
+                if (styles.hasOwnProperty(styleProperty)){
+                    cssPrefixes.forEach(setStyle);
                 }
             }
         }
 
-        if (typeof styles === 'string'){
+        else if (typeof styles === 'string'){
             prop = styles;
 
             // e.g. cssPrefix('transform') -> 'transform,-webkit-transform,...'
             // useful for adding prefixed properties when setting active properties in a CSS transition
             if (typeof value === 'undefined'){
-                res = vendorPrefixes.join(prop + ',') + prop;
+                res = cssPrefixes.join(prop + ',') + prop;
             }
 
             // e.g. cssPrefix('transform', 'rotate(45deg)') -> 'transform:rotate(45deg);-webkit-transform:rotate(45deg);...'
             else {
                 rule = prop + ':' + value + ';';
-                res = vendorPrefixes.join(rule) + rule;
+                res = cssPrefixes.join(rule) + rule;
             }
         }
         return res;
@@ -249,10 +238,10 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         };
     }());
     
-    /*
     // e.g. 'fontColor' -> 'font-color'
     // NOTE: does not check for blank spaces, i.e. for multiple words 'font Color'
-    var camelCaseToHyphens = (function(){
+    // for that, use `capitalLetters = /\s*[A-Z]/g` and `letter.trim().toLowerCase()`
+    camelCaseToHyphens = (function(){
         var capitalLetters = /[A-Z]/g;
 
         return function (str){
@@ -260,94 +249,11 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 return '-' + letter.toLowerCase();
             });
         };
-    });
-    */
+    }());
 
-    // `behaviour` can be 'some', 'every' or 'filter'
-    function matchSelectors(collection, selectors, ancestor, behaviour){
-        var i, len, node, ancestors, matches, matchesCache, 
-            ancestorsLength, isMatch, filtered;
-
-        // The optional `ancestor` node is used to perform the selection on.
-        if (ancestor){
-            if (!Pablo.isPablo(ancestor)){
-                ancestor = toPablo(ancestor);
-            }
-        }
-
-        // Filter to as subset of the collection
-        if (behaviour === 'filter'){
-            filtered = Pablo();
-        }
-
-        for (i=0, len=collection.length; i<len; i++){
-            node = collection.eq(i);
-
-            // If no `ancestor` given, then find the element's root ancestor. If 
-            // the element is currently in the DOM, this will be the `document`.
-            if (!ancestor) {
-                ancestor = node
-                    .relations('parentNode', null, null, isElementOrDocument)
-                    .last();
-            }
-
-            // Use ancestor to find element via a selector query
-            if (ancestor.length){
-                // Have we previously cached the result of the query?
-                // E.g. when many elements in the same collection are being
-                // queried against the `document` node
-                matches = ancestors && matchesCache[ancestors.indexOf(ancestor)];
-
-                if (!matches){
-                    matches = ancestor.find(selectors);
-
-                    // If more than one element in the collection, then
-                    // we temporarily cache the result of the query (the cache
-                    // expires when the function completes
-                    if (len > 1){
-                        // Create the cache containers
-                        if (!matchesCache){
-                            ancestors = [];
-                            matchesCache = [];
-                        }
-                        // Cache the result
-                        ancestorsLength = ancestors.push(ancestor);
-                        matchesCache[ancestorsLength-1] = matches;
-                    }
-                }
-            }
-
-            // Element has no parent
-            // If it is an element (e.g. not `document`), then clone it and 
-            // append to a temporary element
-            else if (isElement(node[0])){
-                node = node.clone();
-                ancestor = Pablo.g().append(node);
-                matches = ancestor.find(selectors);
-            }
-
-            // Is node contained within the list of matches?
-            isMatch = matches && matches.indexOf(node) >= 0;
-            if (isMatch){
-                // At least one element matched
-                if (behaviour === 'some'){
-                    return true;
-                }
-                // Add this element to the filtered subset
-                if (behaviour === 'filter'){
-                    filtered.push(node);
-                }
-            }
-            // Not every element matched
-            else if (behaviour === 'every'){
-                return false;
-            }
-        }
-
-        // If filtering, return the collection; otherwise a boolean.
-        return behaviour === 'filter' ? filtered :
-              (behaviour === 'every'  ? true : false);
-    }
+    // Data cache
+    cache = {};
+    cacheNextId = 1;
     
     
     /////
@@ -357,7 +263,16 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     
     function PabloCollection(node, attr){
         if (node){
-            this.push(node);
+            if (typeof node === 'string' && attr){
+                if (canBeWrapped(attr)){
+                    this.add(Pablo(attr).find(node));
+                    return;
+                }
+                else {
+                    node = make(node);
+                }
+            }
+            this.add(node);
             
             // Apply attributes
             if (attr){
@@ -405,16 +320,88 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             return this.eq(this.length-1);
         },
 
-        // Add new node(s) to the collection; accepts arrays or nodeLists
-        push: function(node){
-            addElementIfUnique(node, this);
-            return this;  
+        add: function (/*node, node,..., prepend*/){
+            var nodes = arguments,
+                numNodes = nodes.length,
+                prepend = false,
+                node, toAdd, nodeInArray, i;
+
+            // `prepend` 
+            if (numNodes > 1 && typeof nodes[numNodes-1] === 'boolean'){
+                prepend = nodes[numNodes-1];
+                numNodes -= 1;
+
+                if (prepend){
+                    nodes = arrayProto.slice.call(nodes, 0, numNodes).reverse();
+                }
+            }
+
+            for (i=0; i<numNodes; i++){
+                node = nodes[i];
+
+                // An SVG or HTML element, or HTML document
+                if (isElement(node) || isHTMLDocument(node) || hasSvgNamespace(node)){
+                    // Add element, if it is not already in the collection
+                    if (arrayProto.indexOf.call(this, node) === -1){
+                        arrayProto[prepend ? 'unshift' : 'push'].call(this, node);
+                    }
+                }
+
+                // A Pablo collection
+                else if (Pablo.isPablo(node)){
+                    // See extensions/functional.js for example usage of node.collection
+                    // TODO: remove support for functional.js?
+                    node = toArray(node.collection || node);
+                    toAdd = node.collection || node;
+                }
+
+                // A string outside of an array acts as a CSS selector
+                else if (typeof node === 'string'){
+                    toAdd = document.querySelectorAll(node);
+                }
+
+                // A nodeList (e.g. result of a selector query, or childNodes)
+                // or is an object like an array, e.g. a jQuery collection
+                else if (isNodeList(node) || isArrayLike(node)){
+                    toAdd = node;
+                }
+
+                // `node` is an array or an array-like collection
+                if (toAdd || Array.isArray(node)){
+                    // Convert to an array of nodes
+                    if (toAdd){
+                        node = toArray(toAdd);
+                    }
+
+                    while (node.length){
+                        // Whether prepending or appending, always process arrays and
+                        // array-like collections in forwards order
+                        nodeInArray = prepend ? node.pop() : node.shift();
+
+                        // A string inside an array is converted to an element
+                        if (typeof nodeInArray === 'string'){
+                            nodeInArray = make(nodeInArray);
+                        }
+
+                        // Add to collection
+                        this.add(nodeInArray, prepend);
+                    }
+
+                    toAdd = null;
+                }
+            }
+            return this;
+        },
+
+        concat: function(){
+            return this.add.apply(Pablo(this), arguments);
         },
         
         // Add new node(s) to the collection; accepts arrays or nodeLists
-        unshift: function(node){
-            addElementIfUnique(node, this, true);
-            return this;
+        unshift: function(){
+            var args = toArray(arguments);
+            args.push(true);
+            return this.add.apply(this, args);
         },
         
         // Remove node from end of the collection
@@ -439,13 +426,6 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             arrayProto.sort.call(this, fn);
             return this;
         },
-
-        indexOf: function(el){
-            if (Pablo.isPablo(el)){
-                el = el[0];
-            }
-            return arrayProto.indexOf.call(this, el);
-        },
         
         each: function(fn, context){
             arrayProto.forEach.call(this, fn, context || this);
@@ -456,67 +436,25 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             return Pablo(arrayProto.map.call(this, fn, context || this));
         },
 
-        some: function(fnOrSelector, context){
-            return typeof fnOrSelector === 'string' ?
-                matchSelectors(this, fnOrSelector, context, 'some') :
-                arrayProto.some.call(this, fnOrSelector, context || this);
-        },
-
-        every: function(fnOrSelector, context){
-            return typeof fnOrSelector === 'string' ?
-                matchSelectors(this, fnOrSelector, context, 'every') :
-                arrayProto.every.call(this, fnOrSelector, context || this);
-        },
-
-        // Note: this method is analogous to Array.filter but is called `select`
-        // here (as in Underscore.js) because Pablo's filter() method is used to
-        // create a `<filter>` SVG element
-        select: function(fnOrSelector, context){
-            return typeof fnOrSelector === 'string' ?
-                matchSelectors(this, fnOrSelector, context, 'filter') :
-                Pablo(arrayProto.filter.call(this, fnOrSelector, context || this));
-        },
-
 
         /////
 
 
         // TRAVERSAL
 
-        // See below for traversal shortcuts using `relations()` e.g. `parents()`
-
-        relations: function(prop, selectors, ancestor, doWhile){
+        // See below for traversal shortcuts that use `traverse()` e.g. `parents()`
+        traverse: function(prop, doWhile, selectors){
             var collection = Pablo(),
                 isFn = typeof doWhile === 'function';
 
-            this.each(function(el){
+            this.each(function(el, i){
                 el = el[prop];
-                while (el && (isFn ? doWhile(el) : true)){
-                    collection.push(el);
-                    el = doWhile ?
-                        el[prop] : null;
+                while (el && (isFn ? doWhile.call(this, el, i) : true)){
+                    collection.add(el);
+                    el = doWhile ? el[prop] : false;
                 }
             });
-            return selectors ? collection.select(selectors, ancestor) : collection;
-        },
-
-        siblings: function(selectors){
-            return this.prevSiblings(selectors)
-                       .push(this.nextSiblings(selectors));
-        },
-
-        // Find each element's SVG root element
-        root: function(selectors){
-            return this.owners(selectors).last();
-        },
-        
-        find: function(selectors){
-            var found = Pablo();
-            
-            this.each(function(el){
-                found.push(el.querySelectorAll(selectors));
-            });
-            return found;
+            return selectors ? collection.select(selectors) : collection;
         },
 
 
@@ -525,7 +463,7 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // MANIPULATION
         
-        remove: function(){
+        detach: function(){
             return this.each(function(el){
                 var parentNode = el.parentNode;
                 if (parentNode){
@@ -533,106 +471,113 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                 }
             });
         },
+
+        remove: function(){
+            // If the cache has any contents
+            if (Object.keys(cache).length){
+                // Remove data for all elements and their descendents
+                this.removeData().find('*').removeData();
+            }
+
+            // Remove from the DOM
+            return this.detach();
+        },
         
         empty: function(){
-            this.children().remove();
-            return this;
-        },
-        
-        // NOTE: the following append-related functions all require attr to exist, even as a blank object, if a new element is to be created. Otherwise, if the first argument is a string, then a selection operation will be performed.
-        // TODO: If appending pre-existing elements, then append to just first element in the collection?
-        append: function(node, attr){
-            this.each(function(el){
-                toPablo(node, attr).each(function(child){
-                    el.appendChild(child);
-                });
-            });
-            return this;
-        },
-        
-        appendTo: function(node, attr){
-            toPablo(node, attr).append(this);
-            return this;
-        },
-        
-        child: function(node, attr){
-            return toPablo(node, attr).appendTo(this);
-        },
-        
-        before: function(node, attr){
+            // If the cache has any contents
+            if (Object.keys(cache).length){
+                // Remove data for each descendent of elements in the collection
+                this.find('*').removeData();
+            }
+
+            // Remove elements, text and other nodes
+            // This uses native DOM methods, rather than `detach()`, to ensure that
+            // non-element nodes are also removed.
             return this.each(function(el){
-                var parentNode = el.parentNode;
-                if (parentNode){
-                    toPablo(node, attr).each(function(toInsert){
-                        parentNode.insertBefore(toInsert, el);
-                    });
+                while (el.firstChild){
+                    el.removeChild(el.firstChild);
                 }
             });
         },
         
-        after: function(node, attr){
-            return this.each(function(el){
-                var parentNode = el.parentNode;
-                if (parentNode){
-                    toPablo(node, attr).each(function(toInsert){
-                        parentNode.insertBefore(toInsert, el.nextSibling);
-                    });
-                }
-            });
-        },
+        /* Arguments:
+        `deepDom`: clones descendent DOM elements and DOM event listeners (default true)
+        `withData` clones data associated with the element
+        `deepData` clones data associated with descendents of the element (defaults to same as `withData`)
+        */
+        clone: function(deepDom, withData, deepData){
+            var isSingle = this.length === 1;
 
-        // Insert every element in the set of matched elements after the target.
-        insertAfter: function(node, attr){
-            toPablo(node, attr).after(this);
-            return this;
-        },
-        
-        // Insert every element in the set of matched elements before the target.
-        insertBefore: function(node, attr){
-            toPablo(node, attr).before(this);
-            return this;
-        },
+            if (typeof deepDom !== 'boolean'){
+                deepDom = true;
+            }
+            if (typeof withData !== 'boolean'){
+                withData = false;
+            }
+            if (typeof deepData !== 'boolean'){
+                deepData = withData;
+            }
 
-        prepend: function(node, attr){
-            return this.each(function(el){
-                var first = el.firstChild;
-                toPablo(node, attr).each(function(child){
-                    el.insertBefore(child, first);
-                });
-            });
-        },
-        
-        prependTo: function(node, attr){
-            toPablo(node, attr).prepend(this);
-            return this;
-        },
-        
-        clone: function(deep){
-            deep = (deep || false);
             return this.map(function(el){
-                return el.cloneNode(deep);
+                var cloned = el.cloneNode(deepDom),
+                    data, node, clonedNode, dataset;
+
+                // Clone data associated with the element
+                if (withData){
+                    // Avoid unnecessary Pablo collection creation
+                    node = isSingle ? this : Pablo(el),
+                    data = node.cloneData();
+
+                    if (data){
+                        // Set data on the cloned element
+                        clonedNode = Pablo(cloned).data(data);
+                    }
+                }
+
+                // Clone descendents' data
+                if (deepDom && deepData){
+                    if (!clonedNode){
+                        clonedNode = Pablo(cloned);
+                    }
+                    dataset = node.pluckData();
+                    clonedNode.find('*').data(dataset);
+                }
+                return cloned;
             });
         },
         
-        duplicate: function(repeats){
+        // `deep` is whether to duplicate child nodes
+        // `deepData` is whether to duplicate data on self and children
+        // TODO: should there be a way of duplicating without adding to the DOM
+        //     i.e. to remove the call to `after()` or to return a new collection
+        duplicate: function(repeats, withData, deepData){
             var duplicates;
 
             if (repeats !== 0){
-                duplicates = Pablo();
-
                 if (typeof repeats !== 'number' || repeats < 0){
                     repeats = 1;
                 }
+
+                // For performance, before cloning data, ensure that the elements 
+                // or their descendents have data associated with them
+                if (withData){
+                    withData = this.hasData();
+                }
+                if (deepData){
+                    deepData = this.find('*').hasData();
+                }
+
+                duplicates = Pablo();
                 
                 // Clone the collection
                 while (repeats --){
-                    duplicates.push(this.clone(true)[0]);
+                    duplicates.add(this.clone(true, withData, deepData));
                 }
 
                 // Insert in the DOM after the collection
                 this.after(duplicates)
                     // Add new elements the collection
-                    .push(duplicates);
+                    .add(duplicates);
             }
             return this;
         },
@@ -697,8 +642,11 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
                         if (colonIndex >= 0){
                             nsPrefix = prop.slice(0, colonIndex);
                             nsURI = Pablo.ns[nsPrefix];
+                            el.setAttributeNS(nsURI, prop, val);
                         }
-                        el.setAttributeNS(nsURI || null, prop, val);
+                        else {
+                            el.setAttributeNS(null, prop, val);
+                        }
                     }
                 }
             }, this);
@@ -707,23 +655,55 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // Return an array of values from an attribute for each element 
         // in the collection
-        pluck: function(attr){
+        pluck: function(property, type){
+            var undef;
+
+            if (!type){
+                type = 'attr';
+            }
+
+            // Pass through `null` as undefined to each method
+            // e.g. `collection.pluck(null, 'data');` will return an array of
+            // data objects, one for each element in the collection.
+            if (property === null){
+                property = undef;
+            }
+
             return toArray(this).map(function(el){
-                return Pablo(el).attr(attr);
+                switch (type){
+                    case 'attr':
+                    return Pablo(el).attr(property);
+
+                    case 'prop':
+                    return el[property];
+
+                    case 'data':
+                    return Pablo(el).data(property);
+
+                    case 'css':
+                    return Pablo(el).css(property);
+
+                    case 'cssPrefix':
+                    return Pablo(el).cssPrefix(property);
+                }
             });
         },
 
+        pluckData: function(){
+            return this.pluck(null, 'data');
+        },
+
         transform: function(functionName, value/* , additional values*/){
+            var isSingle = this.length === 1;
+
             // Additional arguments are space-delimited as part of the value
             if (arguments.length > 2){
                 value = toArray(arguments).slice(1).join(' ');
             }
 
             return this.each(function(el, i){
-                // TODO: replace `node = Pablo(el)` with 
-                // `node = this.length === 1 ? this : Pablo(el)` everywhere that
-                // is appropriate, to avoid unnecessary Pablo collection creation
-                var node = Pablo(el),
+                // Avoid unnecessary Pablo collection creation
+                var node = isSingle ? this : Pablo(el),
                     transformAttr = node.attr('transform'),
                     newTransformAttr, pos, posEnd, transformAttrEnd,
                     functionString = functionName + '(' + this.getValue(value, i) + ')';
@@ -819,37 +799,29 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         // Add prefixed CSS styles to elements in collection
         cssPrefix: function(styles, value){
             var styleProperty;
-            
-            if (typeof styles === 'string' && typeof value !== 'undefined'){
-                // Create styles object
-                styleProperty = styles;
-                styles = {};
-                styles[styleProperty] = value;
+
+            if (typeof styles === 'string'){
+                if (typeof value === 'undefined'){
+                    // Get list of vendor-prefixed versions of the property
+                    // e.g. `transform,-moz-transform,-webkit-transform`
+                    cssPrefix(styles).split(',')
+                        // Find the first defined value and return
+                        .some(function(prefixedStyleProperty){
+                            value = this.css(prefixedStyleProperty);
+                            return value;
+                        }, this);
+                    return value;
+                }
+                else {
+                    // Create styles object
+                    styleProperty = styles;
+                    styles = {};
+                    styles[styleProperty] = value;
+                }
             }
             return this.css(cssPrefix(styles));
-        }
-    });
-
-
-    /////
-
-
-    // DOM EVENTS
-
-    // TODO: support getValue for `type`?
-    function addRemoveListener(domMethod){
-        return function(type, listener, useCapture){
-            // `type` can be a single event type, or a space-delimited list
-            return this.processList(type, function(type){
-                this.each(function(el){
-                    // Add or remove the listener
-                    el[domMethod](type, listener, useCapture || false);
-                });
-            });
-        };
-    }
-
-    extend(pabloCollectionApi, {
+        },
+        
         processList: function(item, fn){
             var collection = this;
 
@@ -866,37 +838,251 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             return this;
         },
 
-        on: addRemoveListener('addEventListener'),
 
-        // Note that if a listener has been added multiple times to an element, 
-        // then it must be removed as many times.
-        off: addRemoveListener('removeEventListener'),
+        // EVENTS
+
+        on: function(type, selectors, listener, useCapture, context){
+            var isSingle, wrapper, eventData;
+
+            // `selectors` argument not given
+            if (typeof listener !== 'function' && typeof selectors === 'function'){
+                context = useCapture;
+                useCapture = listener;
+                listener = selectors;
+                selectors = null;
+            }
+            if (typeof useCapture === 'undefined'){
+                useCapture = false;
+            }
+
+            // Allow binding and triggering events on empty collections
+            // Create a container object to store state
+            if (!this.length){
+                Array.prototype.push.call(this, {});
+            }
+
+            // `listener` is the original callback function
+            // `wrapper` is the function actually applied to the DOM element, and 
+            // may modify the original listener, e.g. by changing the `this` object
+
+            // If a `this` object is given, then bind the listener to the required 
+            // `this` context
+            // TODO: change default context to collection instead of DOM element?
+            if (context){
+                wrapper = function(){
+                    listener.apply(context, arguments);
+                };
+            }
+
+            // Prepare data to cache about the event
+            // With `selectors`, a new eventData object is needed for each element
+            if (!selectors){
+                eventData = {
+                    selectors:  selectors,
+                    listener:   listener,
+                    wrapper:    wrapper || listener,
+                    useCapture: useCapture
+                };
+            }
+
+            isSingle = this.length === 1;
+
+            // If there are multiple, space-delimited event types, then cycle 
+            // through each one
+            return this.processList(type, function(type){
+                // Cycle through each element in the collection
+                this.each(function(el){
+                    var node = isSingle ? this : Pablo(el),
+                        eventsCache = node.data(eventsNamespace),
+                        cache;
+
+                    if (!eventsCache){
+                        eventsCache = {};
+                        node.data(eventsNamespace, eventsCache);
+                    }
+                
+                    cache = eventsCache[type];
+                    if (!cache){
+                        cache = eventsCache[type] = [];
+                    }
+
+                    // `selectors` have been supplied, to set a delegate event
+                    if (selectors){
+                        // Overwrite the wrapper to make it check that the event
+                        // originated on an element matching the selectors
+                        wrapper = function(event){
+                            // Call listener if the target matches the selector
+                            if (event && Pablo(event.target).some(selectors, context)
+                                // TODO: should `context` be passed to `some()`
+                                // to be used for selectors functions or is that
+                                // mixing up concerns?
+                            ){
+                                listener.apply(context || el, arguments);
+                            }
+                        };
+
+                        // Overwrite the wrapper in the data to be cached
+                        eventData = {
+                            selectors:  selectors,
+                            listener:   listener,
+                            wrapper:    wrapper,
+                            useCapture: useCapture
+                        };
+                    }
+
+                    // Add to cache
+                    cache.push(eventData);
+
+                    // Add DOM listener
+                    if ('addEventListener' in el){
+                        el.addEventListener(type, wrapper || listener, useCapture);
+                    }
+                });
+            });
+        },
+
+        off: function(type, selectors, listener, useCapture){
+            var isSingle = this.length === 1;
+
+            // `selectors` argument not given
+            if (typeof selectors === 'function'){
+                useCapture = listener;
+                listener = selectors;
+                selectors = null;
+            }
+            if (typeof useCapture === 'undefined'){
+                useCapture = false;
+            }
+            
+            // If there are multiple, space-delimited event types, then cycle 
+            // through each one
+            return this.processList(type, function(type){
+                this.each(function(el){
+                    var node = isSingle ? this : Pablo(el),
+                        eventsCache = node.data(eventsNamespace),
+                        cache, cachedType;
+
+                    if (!eventsCache){
+                        return;
+                    }
+
+                    // Remove all event listeners
+                    if (!type){
+                        for (cachedType in eventsCache){
+                            if (eventsCache.hasOwnProperty(cachedType)){
+                                node.off(cachedType);
+                            }
+                        }
+                        return;
+                    }
+
+                    cache = eventsCache[type];
+                    if (!cache || !cache.length){
+                        return;
+                    }
+
+                    // Remove DOM listeners and delete from cache. This uses a `some`
+                    // loop rather than `forEach` to allow breaking. And it uses
+                    // `some` rather than a `for` loop as the cache is a sparse array.
+                    cache.some(function(eventData, i){
+                        if (
+                            // If a listener has been passed, is this it?
+                            (listener  === eventData.listener &&
+                            useCapture === eventData.useCapture &&
+                            selectors  === eventData.selectors) ||
+
+                            // Or if no listener was passed...
+                            (!listener && (
+                                !selectors || selectors === eventData.selectors
+                            )
+                        )){
+                            // Remove DOM listener
+                            if ('removeEventListener' in el){
+                                el.removeEventListener(type, eventData.wrapper, eventData.useCapture);
+                            }
+
+                            // If looking for a specific listener, remove from cache
+                            // and break the loop. NOTE: if the listener was set 
+                            // multiple times, it will need removal multiple times.
+                            if (listener){
+                                delete cache[i];
+                                return true;
+                            }
+                        }
+                    });
+
+                    // Delete the cache container for this event type, if empty
+                    if (!listener || !Object.keys(eventsCache[type]).length){
+                        delete eventsCache[type];
+                    }
+                    // Delete the events container for this element, if empty
+                    if (!Object.keys(eventsCache).length){
+                        node.removeData(eventsNamespace); 
+                    }
+                });
+            });
+        },
 
         // Trigger listener once per collection
-        one: function(type, listener, useCapture, context){
+        one: function(type, selectors, listener, useCapture, context){
             var collection = this;
+
+            // `selectors` argument not given
+            if (typeof selectors === 'function'){
+                context = useCapture;
+                useCapture = listener;
+                listener = selectors;
+                selectors = null;
+            }
 
             function removeListener(){
                 // Remove listener and additional listener
-                collection.off(type, listener,       useCapture, context)
-                          .off(type, removeListener, useCapture, context);
+                collection.off(type, selectors, listener,       useCapture, context)
+                          .off(type, selectors, removeListener, useCapture, context);
             }
 
             // Add the original listener, and an additional listener that removes
-            // the first, and itself. The reason a wrapper listener is not used
+            // the first, and itself. The reason a single wrapper is not used
             // instead of two separate listeners is to allow manual removal of
             // the original listener (with `.off()`) before it ever triggers.
-            return this.on(type, listener,       useCapture, context)
-                       .on(type, removeListener, useCapture, context);
+            return this.on(type, selectors, listener,       useCapture, context)
+                       .on(type, selectors, removeListener, useCapture, context);
         },
 
         // Trigger listener once per element in the collection
         oneEach: function(){
-            var args = arguments;
+            var args = arguments,
+                isSingle = this.length === 1;
 
             return this.each(function(el){
-                var node = Pablo(el);
+                // Avoid unnecessary Pablo collection creation
+                var node = isSingle ? this : Pablo(el);
                 node.one.apply(node, args);
+            });
+        },
+
+        // TODO: optional `context` as second argument?
+        trigger: function(type /*, arbitrary args to pass to listener*/){
+            var args = toArray(arguments),
+                isSingle = this.length === 1;
+
+            return this.each(function(el){
+                var node = isSingle ? this : Pablo(el),
+                    eventsCache = node.data(eventsNamespace);
+
+                if (eventsCache){
+                    // If there are multiple, space-delimited event types, then cycle 
+                    // through each one
+                    this.processList(type, function(type){
+                        var cache = eventsCache[type];
+                        if (cache){
+                            args[0] = {type:type, target:el};
+                            cache.forEach(function(eventData){
+                                eventData.wrapper.apply(el, args);
+                            }, node);
+                        }
+                    });
+                }
             });
         }
     });
@@ -904,38 +1090,350 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
     /////
 
+    // DATA
+
+    (function(){
+        function removeData(el, key){
+            var id = el[cacheExpando],
+                data;
+
+            // Delete all keys
+            if (!key){
+                delete cache[id];
+            }
+
+            else {
+                // Delete a specific key
+                data = cache[id];
+                if (data){
+                    // Delete the key
+                    if (Object.keys(data).length > 1){
+                        delete cache[id][key];
+                    }
+                    // The data container is empty, so delete it
+                    else {
+                        delete cache[id];
+                        // Delete the element's data reference
+                        // This removal is used by hasData to quickly determine
+                        // if the element has associated data
+                        delete el[cacheExpando];
+                        // TODO: this may make the counter increment faster, where
+                        // an element is continually having events added and removed.
+                        // It is assumed that JavaScript's integer limit will not
+                        // be reached in the lifetime of a program. Is that OK?
+                    }
+                }
+            }
+        }
+
+        extend(pabloCollectionApi, {
+            data: function(key, value){
+                var id, data;
+
+                // First argument is an object of key-value pairs
+                if (typeof key === 'object'){
+                    data = this.getValue(key);
+                }
+
+                // Get value - e.g. collection.data('foo') or collection.data()
+                else {
+                    if (typeof value === 'undefined'){
+                        if (this.length){
+                            // Use the id of the first element in the collection
+                            id = this[0][cacheExpando];
+
+                            if (id && id in cache){
+                                return typeof key === 'undefined' ?
+                                    cache[id] : cache[id][key];
+                            }
+                        }
+                        return;
+                    }
+
+                    // Set value via (key, value); prepare data object
+                    data = {};
+                    data[key] = value;
+                }
+
+                // If there are no elements in the collection, so the collection
+                // is empty, then store a plain object to carry the collection's
+                // state. Used, for example, to allow an empty collection to 
+                // have events bound and triggered to it.
+                //      `var e = Pablo().on('foo', fn); e.trigger('foo');`
+                if (!this.length){
+                    arrayProto.push.call(this, {});
+                }
+                
+                // Set data for each element
+                return this.each(function(el){
+                    var id = el[cacheExpando];
+
+                    if (!id){
+                        id = el[cacheExpando] = cacheNextId ++;
+                    }
+
+                    if (!cache[id]){
+                        cache[id] = {};
+                    }
+
+                    extend(cache[id], data);
+                });
+            },
+
+            removeData: function(keys){
+                return this.each(function(el){
+                    // Remove single or multiple, space-delimited keys
+                    if (keys){
+                        this.processList(keys, function(key){
+                            removeData(el, key);
+                        });
+                    }
+                    // Remove everything
+                    else {
+                        removeData(el);
+                    }
+                });
+            },
+
+            hasData: function(deepData, includeSelf){
+                return Object.keys(cache).length > 0 &&
+                    this.some(function(el){
+                        var onThis, onChildren;
+
+                        if (includeSelf !== false){
+                            onThis = !!el[cacheExpando];
+                        }
+                        if (deepData && !onThis){
+                            onChildren = Pablo(el).find('*').hasData();
+                        }
+                        return onThis || onChildren;
+                    });
+            },
+
+            cloneData: function(){
+                var data = this.data(),
+                    events, clonedEvents, type;
+
+                if (data){
+                    // Copy events object
+                    events = data[eventsNamespace];
+                    if (events){
+                        // Duplicate data object and events object on it, to
+                        // de-reference the cloned element's stored events
+                        data = Object.create(data);
+                        clonedEvents = data[eventsNamespace] = Object.create(events);
+                        // For each event type, e.g. `mousedown`, copy the array
+                        // of event listeners
+                        for (type in events){
+                            if (events.hasOwnProperty(type)){
+                                // Create new array
+                                clonedEvents[type] = events[type].slice();
+                            }
+                        }
+                    }
+                }
+                return data;
+            },
+
+            matches: function(methodName, comparison, context){
+                var index, filtered;
+
+                // function
+                if (typeof comparison === 'function'){
+                    if (!context){
+                        context = this;
+                    }
+
+                    switch (methodName){
+                        case 'indexOf':
+                        index = -1;
+                        arrayProto.some.call(this, function(el, i){
+                            if (comparison.call(context, el, i, this)){
+                                index = i;
+                                return true;
+                            }
+                        }, context);
+                        return index;
+
+                        case 'select':
+                        filtered = Pablo();
+                        arrayProto.filter.call(this, function(el, i){
+                            if (comparison.call(context, el, i, this)){
+                                filtered.add(el);
+                            }
+                        }, context);
+                        return filtered;
+
+                        // 'some' & 'every'
+                        default:
+                        return arrayProto[methodName].call(this, comparison, context);
+                    }
+                }
+
+                // CSS selector
+                if (typeof comparison === 'string'){
+                    return this.matches(methodName, function(el){
+                        return el[matchesProp](comparison);
+                    });
+                }
+
+                else {
+                    comparison = toPablo(comparison);
+                }
+
+                // `every`, `some` & `indexOf`
+                return this.matches(methodName, function(el){
+                    return comparison.some(function(compareEl){
+                        return el === compareEl;
+                    });
+                });
+            }
+        });
+    }());
+
+
+    /////
+
 
     // API SHORTCUTS
+        
+    // iterator e.g. `function(el, insertEl){el.appendChild(insertEl);}`
+    // `insertIntoThis` is boolean flag (default true) - if true, will insert 
+    // subject elements into the collection
+    function insert(iterator, insertIntoThis, returnThis){
+        return function(node, attr, withData, deepData){
+            var insertInto, toInsert, createdHere;
 
-    function walk(prop, doWhile){
-        return function(selectors, ancestor){
-            return this.relations(prop, selectors, ancestor, doWhile);
+            if (this.length){
+                if (insertIntoThis === false){
+                    insertInto = toPablo(node, attr);
+                    toInsert = this;
+                }
+                else {
+                    insertInto = this;
+                    toInsert = toPablo(node, attr);
+                }
+
+                insertInto.each(function(el, i){
+                    // If there are multiple elements being inserted into, e.g.
+                    //     Pablo(['g','a']).append(Pablo.g());
+                    // then clone the elements to be inserted. If the elements
+                    // were created by this function, via `toPablo` then clone shallow
+                    if (i){
+                        createdHere = typeof node === 'string' && !canBeWrapped(attr);
+                        toInsert = createdHere ?
+                            toInsert.clone(false) :
+                            toInsert.clone(true, withData, deepData);
+                    }
+
+                    toInsert.each(function(insertEl){
+                        iterator.call(insertInto, el, insertEl);
+                    });
+                });
+            }
+            return returnThis === false ? toInsert : this;
+        };
+    }
+
+    function append(el, insertEl){
+        el.appendChild(insertEl);
+    }
+
+    function prepend(el, insertEl){
+        el.insertBefore(insertEl, el.firstChild);
+    }
+
+    function before(el, toInsert){
+        if (el.parentNode){
+            el.parentNode.insertBefore(toInsert, el);
+        }
+    }
+
+    function after(el, toInsert){
+        if (el.parentNode){
+            el.parentNode.insertBefore(toInsert, el.nextSibling);
+        }
+    }
+
+    function traverse(prop, doWhile){
+        return function(selectors){
+            return this.traverse(prop, doWhile, selectors);
+        };
+    }
+
+    function matches(methodName){
+        return function(comparison, context){
+            return this.matches(methodName, comparison, context);
         };
     }
 
     extend(pabloCollectionApi, {
-        // Traversal methods
-        children:     walk('childNodes',             null),
-        firstChild:   walk('firstChild',             null),
-        lastChild:    walk('lastChild',              null),
-        prev:         walk('previousElementSibling', null),
-        prevSiblings: walk('previousElementSibling', true),
-        next:         walk('nextElementSibling',     null),
-        nextSiblings: walk('nextElementSibling',     true),
-        viewport:     walk('viewportElement',        null),
-        viewports:    walk('viewportElement',        true),
-        owner:        walk('ownerSVGElement',        null),
-        owners:       walk('ownerSVGElement',        true),
-        parent:       walk('parentNode',             null),
-        parents:      walk('parentNode',             isElement),
-        parentsSvg:   walk('parentNode',             isSVGElement),
+        // ARRAY-LIKE QUERY
+        indexOf: matches('indexOf'),
+        some: matches('some'),
+        every: matches('every'),
+        select: matches('select'),
+        // Note: `select()` is analogous to Array.filter but is called `select`
+        // here (as in Underscore.js) because Pablo's filter() method is used to
+        // create a `<filter>` SVG element.
 
-        // Alias methods
+
+        // INSERTION
+        child:        insert(append, true, false),
+        append:       insert(append),
+        appendTo:     insert(append, false),
+        prepend:      insert(prepend),
+        prependTo:    insert(prepend, false),
+        before:       insert(before),
+        insertBefore: insert(before, false),
+        after:        insert(after),
+        insertAfter:  insert(after, false),
+
+
+        // TRAVERSAL
+        // NOTE: ideally, we'd use the 'children' collection, instead of 'childNodes'
+        // which has support in HTML but not yet wide support in SVG elements
+        // See https://hacks.mozilla.org/2009/06/dom-traversal/
+        // Bug report in WebKit: https://bugs.webkit.org/show_bug.cgi?id=112698
+        children:     traverse('childNodes'),
+        firstChild:   traverse('firstElementChild'),
+        lastChild:    traverse('lastElementChild'),
+        prev:         traverse('previousElementSibling'),
+        prevSiblings: traverse('previousElementSibling', true),
+        next:         traverse('nextElementSibling'),
+        nextSiblings: traverse('nextElementSibling', true),
+        viewport:     traverse('viewportElement'),
+        viewports:    traverse('viewportElement', true),
+        owner:        traverse('ownerSVGElement'),
+        owners:       traverse('ownerSVGElement', true),
+        parent:       traverse('parentNode'),
+        parents:      traverse('parentNode', isElement),
+        parentsSvg:   traverse('parentNode', isSVGElement),
+        ancestor:     function(){
+            return this.traverse('parentNode', isElementOrDocument).last();
+        },
+        // Find each element's SVG root element
+        root: function(selectors){
+            return this.owners(selectors).last();
+        },
+        siblings: function(selectors){
+            return this.prevSiblings(selectors)
+                       .add(this.nextSiblings(selectors));
+        },
+        find: function(selectors){
+            return this.map(function(el){
+                return el.querySelectorAll(selectors);
+            });
+        }
+    });
+
+    // ALIASES
+
+    extend(pabloCollectionApi, {
         elements: pabloCollectionApi.toArray,
-        add:      pabloCollectionApi.push,
-        concat:   pabloCollectionApi.push,
+        push:     pabloCollectionApi.add,
         forEach:  pabloCollectionApi.each,
-        is:       pabloCollectionApi.some
+        is: pabloCollectionApi.some
     });
 
 
@@ -978,8 +1476,10 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         cssClassApi = {
             // Return true if _any_ element has className
             hasClass: function(className){
+                var isSingle = this.length === 1;
                 return this.some(function(el, i){
-                    var node = Pablo(el),
+                    // Avoid unnecessary Pablo collection creation
+                    var node = isSingle ? this : Pablo(el),
                         val = this.getValue(className, i),
                         classString = node.attr('class');
 
@@ -989,8 +1489,10 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             },
 
             addClass: function(className){
+                var isSingle = this.length === 1;
                 return this.each(function(el, i){
-                    var node = Pablo(el),
+                    // Avoid unnecessary Pablo collection creation
+                    var node = isSingle ? this : Pablo(el),
                         val = this.getValue(className, i),
                         classString;
 
@@ -1005,8 +1507,10 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             },
 
             removeClass: function(className){
+                var isSingle = this.length === 1;
                 return this.each(function(el, i){
-                    var node = Pablo(el),
+                    // Avoid unnecessary Pablo collection creation
+                    var node = isSingle ? this : Pablo(el),
                         val = this.getValue(className, i);
 
                     this.processList(val, function(className){
@@ -1024,8 +1528,10 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
             },
 
             toggleClass: function(className){
+                var isSingle = this.length === 1;
                 return this.each(function(el, i){
-                    var node = Pablo(el),
+                    // Avoid unnecessary Pablo collection creation
+                    var node = isSingle ? this : Pablo(el),
                         val = this.getValue(className, i);
 
                     this.processList(val, function(className){
@@ -1055,39 +1561,16 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
     // PABLO API
 
-    // Create Pablo: return a PabloCollection instance
-    function createPablo(node, attr){
-        return new PabloCollection(node, attr);
-    }
-    
-    // Select existing nodes in the document
-    function selectPablo(selectors, context){
-        // Valid selectors
-        if (selectors && typeof selectors === 'string'){
-            return Pablo((context || document).querySelectorAll(selectors));
-        }
-        // Return empty Pablo collection
-        return createPablo();
-    }
-
-    
-    // **
-    
-
     // Pablo main function
     function Pablo(node, attr){
-        if (!node || attr || Pablo.canBeWrapped(node)){
-            return Pablo.create(node, attr);
-        }
-        else {
-            return Pablo.select(node);
-        }
+        return new PabloCollection(node, attr);
     }
     
     // Pablo methods
     extend(Pablo, {
         v: pabloVersion,
         isSupported: true,
+        supportsClassList: supportsClassList,
         ns: {
             svg: svgns,
             xlink: xlinkns
@@ -1098,8 +1581,9 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
         // methods
         make: make,
-        create: createPablo,
-        select: selectPablo,
+        isArray: function(obj){
+            return Array.isArray(obj);
+        },
         isArrayLike: isArrayLike,
         isElement: isElement,
         isSVGElement: isSVGElement,
@@ -1114,12 +1598,19 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
         getAttributes: getAttributes,
         canBeWrapped: canBeWrapped,
         hyphensToCamelCase: hyphensToCamelCase,
+        camelCaseToHyphens: camelCaseToHyphens,
 
-        // css related
+        // vendor prefixes
         vendorPrefixes: vendorPrefixes,
+        cssPrefixes: cssPrefixes,
+        getPrefixedProperty: getPrefixedProperty,
         cssPrefix: cssPrefix,
             // e.g. Pablo('svg').style().content('#foo{' + Pablo.cssPrefix('transform', 'rotate(45deg)') + '}');
             // e.g. myElement.css({'transition-property': Pablo.cssPrefix('transform')});
+
+        // data
+        // TODO: should `Pablo.cache` & `.data()` be removed, to keep cache private?
+        cache: cache,
 
         // TODO: support `collection.append('myTemplate')`
         template: function(name, callback){
@@ -1143,17 +1634,17 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
 
     
     // SVG ELEMENT METHODS
-    'a altGlyph altGlyphDef altGlyphItem animate animateColor animateMotion animateTransform circle clipPath color-profile cursor defs desc ellipse feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence filter font font-face font-face-format font-face-name font-face-src font-face-uri foreignObject g glyph glyphRef hkern image line linearGradient marker mask metadata missing-glyph mpath path pattern polygon polyline radialGradient rect script set stop style svg switch symbol text textPath title tref tspan use view vkern'.split(' ')
+    svgElements.split(' ')
         .forEach(function(nodeName){
             var camelCase = hyphensToCamelCase(nodeName),
                 createElement = function(attr){
-                    return Pablo.create(nodeName, attr);
+                    return Pablo(make(nodeName), attr);
                 };
 
             if (nodeName === 'svg'){
                 createElement = function(attr){
                     attr = extend(attr, {version: svgVersion});
-                    return Pablo.create(nodeName, attr);
+                    return Pablo(make(nodeName), attr);
                 };
             }
             
@@ -1168,5 +1659,16 @@ var Pablo = (function(document, Array, Element, SVGElement, NodeList, HTMLDocume
     
     /////
     
-    return Pablo;
-}(window.document, window.Array, window.Element, window.SVGElement, window.NodeList, window.HTMLDocument));
+    // Set as a global variable
+    root.Pablo = Pablo;
+
+}(
+    this,
+    this.Object,
+    this.Array,
+    this.Element,
+    this.SVGElement,
+    this.NodeList,
+    this.HTMLDocument,
+    this.document
+));

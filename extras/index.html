@@ -9,22 +9,21 @@
     <body>
         <section id="mindmap"></section>
 
-        <!-- Pablo, plus (temporarily) plugins -->
+        <!-- Pablo -->
         <script src="../pablo.js"></script>
-        <script src="../plugins/data.js"></script>
-        <script src="../plugins/advanced-events.js"></script>
 
-        <-- Mindmap app ->
+        <!-- Mindmap app -->
         <script src="../mindmap.js?v7"></script>
         <script src="../extras/extras.js"></script>
 
-        <-- Initialisation -->
+        <!-- Initialisation -->
         <script>
             // Check browser support
             if (Pablo.isSupported){
                 var mm = new MindMap('#mindmap');
                 // You can play with the `mm` object in the browser developer console
                 
+                mm.resetUi();
                 mm.addIcons();
                 mm.restoreState();
             }
