@@ -100,19 +100,17 @@
         // The minimum node data in memory necessary to recreate
         // the map is saved in localStorage and can be later restored
         saveState: function(){
-            var nodes = this.nodes,
-                nodesData;
+            var nodesData = [];
 
-            nodesData = nodes.map(function(node){
-                return {
+            this.nodes.forEach(function(node){
+                nodesData.push({
                     id:       node.id,
                     parentId: node.parent && node.parent.id,
                     title:    node.title,
                     dx:       node.dx,
                     dy:       node.dy
-                };
+                });
             });
-
             return this.setLocalStorage('nodes', nodesData);
         },
 
