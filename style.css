@@ -62,6 +62,10 @@ html, body, #mindmap, svg {
 	stroke-width: 1;
 }
 
+.node:first-child.selected > rect {
+	stroke: 'none';
+}
+
 
 /* Different styles for the first node of the mindmap */
 svg > .node > rect, 

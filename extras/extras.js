@@ -98,7 +98,23 @@
 
 
         // The minimum node data in memory necessary to recreate
-        // the map is saved in localStorage and can be later restored
+        getState: function(){
+            var nodesData = [];
+
+            this.nodes.forEach(function(node){
+                nodesData.push({
+                    id:       node.id,
+                    parentId: node.parent && node.parent.id,
+                    title:    node.title,
+                    dx:       node.dx,
+                    dy:       node.dy
+                });
+            });
+            return nodesData;
+        },
+
+
+        // The map is saved in localStorage and can be later restored
         saveState: function(){
             var nodesData = [];
 
@@ -122,21 +138,27 @@
                 this.resetUi();
 
                 // Draw every node in the stored cache
-                nodesData.forEach(function(settings){
-                    this.nodes.some(function(cachedNode){
-                        if (cachedNode.id === settings.parentId){
-                            settings.parent = cachedNode;
-                            return true;
-                        }
-                    }, this);
-
-                    this.createNode(settings);
-                }, this);
+                this.restoreFrom(nodesData);
 
                 // Set the next id counter to the latest node
                 lastNode = nodesData[nodesData.length-1];
                 this.nextId = lastNode.id + 1;
             }
+            return this;
+        },
+
+        restoreFrom: function(nodes){
+            // Draw each node
+            nodes.forEach(function(settings){
+                this.nodes.some(function(cachedNode){
+                    if (cachedNode.id === settings.parentId){
+                        settings.parent = cachedNode;
+                        return true;
+                    }
+                }, this);
+
+                this.createNode(settings);
+            }, this);
             return this;
         },
 
@@ -148,6 +170,7 @@
             var title = this.askTitle();
 
             if (title){
+                node.title = title;
                 node.setText(title)
                     .dom.children('.node').each(function(el){
                         Pablo(el).data('node').setPath();
